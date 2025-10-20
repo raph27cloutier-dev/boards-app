@@ -1,0 +1,13 @@
+{
+  "name": "boards-app",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "build": "cd backend && npm install && npx prisma generate",
+    "start": "cd backend && npx prisma migrate deploy && node server.js"
+  }
+}
