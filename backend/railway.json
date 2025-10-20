@@ -1,0 +1,32 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "npx prisma migrate deploy && npx prisma generate && node server.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+Commit it.
+
+---
+
+## 🔧 Step 2: Fix Railway Service Settings
+
+Go back to Railway:
+
+1. Click on your **backend service**
+2. Go to **"Settings"** tab
+3. Scroll to **"Build"** section
+4. Find **"Build Command"** and set it to:
+```
+   npm install && npx prisma generate
+```
+
+5. Find **"Start Command"** and set it to:
+```
+   npx prisma migrate deploy && node server.js
