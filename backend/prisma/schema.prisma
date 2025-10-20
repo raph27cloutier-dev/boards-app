@@ -1,0 +1,95 @@
+// schema.prisma - Boards Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  username      String   @unique
+  passwordHash  String
+  displayName   String
+  bio           String?
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  events        Event[]
+  rsvps         RSVP[]
+  followers     Follow[] @relation("Following")
+  following     Follow[] @relation("Followers")
+  
+  @@map("users")
+}
+
+model Event {
+  id              String    @id @default(uuid())
+  title           String
+  description     String
+  imageUrl        String
+  startTime       DateTime
+  endTime         DateTime?
+  
+  // Location
+  venueName       String?
+  address         String
+  neighborhood    String
+  latitude        Float
+  longitude       Float
+  
+  // Metadata
+  vibe            String[]  // ["Loud", "Wild", "Creative"]
+  eventType       String    // "party", "concert", "market", etc.
+  capacity        Int?
+  ageRestriction  String?   // "All ages", "19+", "21+"
+  ticketLink      String?
+  
+  // Relations
+  hostId          String
+  host            User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  rsvps           RSVP[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([startTime])
+  @@index([neighborhood])
+  @@index([latitude, longitude])
+  @@map("events")
+}
+
+model RSVP {
+  id        String   @id @default(uuid())
+  userId    String
+  eventId   String
+  status    String   @default("going") // "going", "interested", "maybe"
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, eventId])
+  @@index([eventId])
+  @@map("rsvps")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  
+  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
+}
