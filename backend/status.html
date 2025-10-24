@@ -51,6 +51,39 @@
       font-size: 0.95rem;
     }
 
+    .controls {
+      max-width: 960px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .controls button {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.68rem;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .controls button.active {
+      background: rgba(247, 37, 133, 0.18);
+      border-color: rgba(247, 37, 133, 0.6);
+      color: var(--accent);
+    }
+
+    .controls .note {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
     #events {
       width: 100%;
       max-width: 960px;
@@ -140,6 +173,25 @@
       margin-top: 32px;
     }
 
+    .reasons {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .reasons li {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
     footer {
       margin-top: 40px;
       font-size: 0.75rem;
@@ -153,6 +205,12 @@
     <p class="description">Live snapshot of Montréal happenings. Data sourced straight from the Boards API.</p>
   </header>
 
+  <section id="controls" class="controls">
+    <button type="button" data-mode="feed" class="active">All events</button>
+    <button type="button" data-mode="reco">Recommended for me</button>
+    <span class="note">Demo pulls for raph@boards.app</span>
+  </section>
+
   <section id="events"></section>
   <div id="status" class="loading">Loading events...</div>
 
@@ -161,67 +219,181 @@
   <script>
     const statusEl = document.getElementById('status');
     const eventsEl = document.getElementById('events');
+    const controlsEl = document.getElementById('controls');
 
-    async function loadEvents() {
+    const DEFAULT_LOCATION = { lat: 45.52, lng: -73.57 };
+
+    let mode = 'feed';
+    let feedCache = [];
+    let recoCache = null;
+    let demoUserId = null;
+
+    function setStatus(message, variant = 'loading') {
+      statusEl.textContent = message;
+      statusEl.className = variant;
+    }
+
+    function renderEvents(events, { showReasons = false } = {}) {
+      eventsEl.innerHTML = '';
+
+      if (!Array.isArray(events) || events.length === 0) {
+        if (mode === 'feed') {
+          setStatus('No events yet — run the seed to populate Montréal demos.');
+        } else {
+          setStatus('No personalised picks yet. Try seeding and recording feedback.');
+        }
+        return;
+      }
+
+      setStatus(`${events.length} happenings`);
+
+      events.forEach((event) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = new Date(event.startTime).toLocaleString('en-CA', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        card.appendChild(badge);
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = event.title;
+        card.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const neighborhood = event.neighborhood || 'Montreal';
+        const venue = event.venueName || 'Pop-up location';
+        const host = event.host?.displayName || 'Unknown';
+        const distance = event.distanceKm ?? event.distance;
+        const distanceCopy =
+          typeof distance === 'number' && Number.isFinite(distance)
+            ? ` · ${distance.toFixed(1)} km away`
+            : '';
+        meta.innerHTML = `
+          <span>${neighborhood} · ${venue}${distanceCopy}</span>
+          <span>Host: ${host}</span>
+        `;
+        card.appendChild(meta);
+
+        const vibes = document.createElement('div');
+        vibes.className = 'vibes';
+        (event.vibe || []).forEach((tag) => {
+          const chip = document.createElement('span');
+          chip.textContent = tag;
+          vibes.appendChild(chip);
+        });
+        card.appendChild(vibes);
+
+        if (showReasons) {
+          const reasons = Array.isArray(event.reasons) ? event.reasons.filter(Boolean) : [];
+          if (reasons.length) {
+            const list = document.createElement('ul');
+            list.className = 'reasons';
+            reasons.forEach((reason) => {
+              const item = document.createElement('li');
+              item.textContent = reason;
+              list.appendChild(item);
+            });
+            card.appendChild(list);
+          }
+        }
+
+        eventsEl.appendChild(card);
+      });
+    }
+
+    async function loadFeed() {
       try {
+        setStatus('Loading events...');
         const response = await fetch('/api/events');
         if (!response.ok) {
           throw new Error('Failed to load events');
         }
         const events = await response.json();
-        if (!Array.isArray(events) || events.length === 0) {
-          statusEl.textContent = 'No events in the feed yet — run the seed script to populate Montréal demos.';
-          statusEl.className = 'loading';
-          return;
+        feedCache = Array.isArray(events) ? events : [];
+        if (!demoUserId) {
+          demoUserId = feedCache.find((event) => event.host?.id)?.host?.id || null;
         }
-
-        statusEl.remove();
-        events.forEach((event) => {
-          const card = document.createElement('article');
-          card.className = 'card';
-
-          const badge = document.createElement('span');
-          badge.className = 'badge';
-          badge.textContent = new Date(event.startTime).toLocaleString('en-CA', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          card.appendChild(badge);
-
-          const title = document.createElement('div');
-          title.className = 'title';
-          title.textContent = event.title;
-          card.appendChild(title);
-
-          const meta = document.createElement('div');
-          meta.className = 'meta';
-          meta.innerHTML = `
-            <span>${event.neighborhood || 'Montreal'} · ${event.venueName || 'Pop-up location'}</span>
-            <span>Host: ${event.host?.displayName || 'Unknown'}</span>
-          `;
-          card.appendChild(meta);
-
-          const vibes = document.createElement('div');
-          vibes.className = 'vibes';
-          (event.vibe || []).forEach((tag) => {
-            const chip = document.createElement('span');
-            chip.textContent = tag;
-            vibes.appendChild(chip);
-          });
-          card.appendChild(vibes);
-
-          eventsEl.appendChild(card);
-        });
+        renderEvents(feedCache);
       } catch (error) {
-        statusEl.textContent = 'Could not load events. Check the API logs or try again.';
-        statusEl.className = 'error';
+        console.error(error);
+        setStatus('Could not load events. Check the API logs or try again.', 'error');
       }
     }
 
-    loadEvents();
+    async function loadRecommendations(force = false) {
+      try {
+        if (!demoUserId) {
+          await loadFeed();
+        }
+        if (!demoUserId) {
+          setStatus('No demo user available for recommendations yet. Seed the database first.', 'error');
+          return;
+        }
+
+        if (!force && Array.isArray(recoCache)) {
+          renderEvents(recoCache, { showReasons: true });
+          return;
+        }
+
+        setStatus('Pulling personalised picks...');
+        const response = await fetch('/api/reco/feed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: demoUserId,
+            location: DEFAULT_LOCATION,
+            radiusKm: 12,
+            when: 'weekend',
+            max: 12,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load recommendations');
+        }
+
+        const data = await response.json();
+        recoCache = Array.isArray(data?.events) ? data.events : [];
+        renderEvents(recoCache, { showReasons: true });
+      } catch (error) {
+        console.error(error);
+        setStatus('Could not load recommendations. Confirm the API is running and seeded.', 'error');
+      }
+    }
+
+    function setMode(nextMode) {
+      if (mode === nextMode) return;
+      mode = nextMode;
+      controlsEl.querySelectorAll('button[data-mode]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.mode === mode);
+      });
+      if (mode === 'feed') {
+        renderEvents(feedCache);
+      } else {
+        loadRecommendations();
+      }
+    }
+
+    controlsEl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-mode]');
+      if (!button) return;
+      if (button.dataset.mode === 'feed') {
+        setMode('feed');
+      } else if (button.dataset.mode === 'reco') {
+        setMode('reco');
+      }
+    });
+
+    loadFeed();
   </script>
 </body>
 </html>

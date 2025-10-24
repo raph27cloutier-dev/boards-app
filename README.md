@@ -65,10 +65,10 @@ If you omit `CLOUDINARY_*` variables the API will still run, but file uploads wi
 With the server running locally:
 
 - `GET /healthz` → `{ "ok": true }`
-- `GET /api/events` → seeded event feed (supports filters via `when`, `lat/lng`, `vibe`, `search`)
+- `GET /api/events` → seeded event feed (supports filters via `when`, `near=45.52,-73.57`, `radiusKm=8`, `vibes=Chill,Wild`, and free-text `search`)
 - `POST /api/reco/feed` → ranked recommendations (body example below)
 - `POST /api/reco/feedback` → record interactions for the agent
-- `GET /status` → static HTML page that fetches `/api/events` and renders poster cards
+- `GET /status` → static HTML page that fetches `/api/events`, and includes a “Recommended for me” toggle that hits `/api/reco/feed`
 
 Example recommendation request:
 
