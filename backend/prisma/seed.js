@@ -1,34 +1,56 @@
-{
-  "name": "boards-backend",
-  "version": "1.0.0",
-  "description": "Boards API - Montreal events discovery platform",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "deploy": "prisma migrate deploy && node server.js"
-  },
-  "keywords": ["events", "montreal", "api"],
-  "author": "Boards Team",
-  "license": "MIT",
-  "dependencies": {
-    "@prisma/client": "^5.7.0",
-    "bcryptjs": "^2.4.3",
-    "cloudinary": "^1.41.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2",
-    "prisma": "^5.7.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🎃 Seeding Boards database...');
+
+  const passwordHash = await bcrypt.hash('boards2025', 10);
+  
+  const raph = await prisma.user.upsert({
+    where: { email: 'raph@boards.app' },
+    update: {},
+    create: {
+      email: 'raph@boards.app',
+      username: 'raph27',
+      passwordHash: passwordHash,
+      displayName: 'Raph',
+      bio: 'Founder of Boards',
+    },
+  });
+
+  console.log('✅ Created user:', raph.username);
+
+  const halloweenRager = await prisma.event.create({
+    data: {
+      title: 'Halloween Rager',
+      description: 'Cool house party pour célébrer Halloween! 🎃',
+      imageUrl: 'https://images.unsplash.com/photo-1509557965875-b88c97052f0e?w=800',
+      startTime: new Date('2025-10-31T20:00:00-04:00'),
+      endTime: new Date('2025-11-01T02:00:00-04:00'),
+      venueName: 'House Party',
+      address: '15 Avenue Personne, Montreal, QC',
+      neighborhood: 'Plateau Mont-Royal',
+      latitude: 45.5276,
+      longitude: -73.5789,
+      vibe: ['Chill', 'Wild', 'Creative'],
+      eventType: 'party',
+      capacity: 50,
+      ageRestriction: 'All ages',
+      ticketLink: null,
+      hostId: raph.id,
+    },
+  });
+
+  console.log('🎃 Created event:', halloweenRager.title);
 }
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
