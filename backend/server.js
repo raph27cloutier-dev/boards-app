@@ -3,15 +3,82 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const morgan = require('morgan');
+const fs = require('fs');
+const pino = require('pino');
+const pinoHttp = require('pino-http');
 const path = require('path');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { PrismaClient } = require('@prisma/client');
+const { Registry, collectDefaultMetrics, Counter, Histogram } = require('prom-client');
 require('dotenv').config();
 
 const app = express();
 const prisma = new PrismaClient();
+
+const LOG_DESTINATION = process.env.LOG_DESTINATION || 'stdout';
+const resolvedLogPath = LOG_DESTINATION.startsWith('file:')
+  ? LOG_DESTINATION.slice('file:'.length)
+  : LOG_DESTINATION;
+const destinationStream = (() => {
+  if (!resolvedLogPath || resolvedLogPath === 'stdout') {
+    return pino.destination({ dest: 1, sync: false });
+  }
+  if (resolvedLogPath === 'stderr') {
+    return pino.destination({ dest: 2, sync: false });
+  }
+  return fs.createWriteStream(resolvedLogPath, { flags: 'a' });
+})();
+
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    base: {
+      service: 'boards-backend',
+      environment: process.env.NODE_ENV || 'development',
+    },
+    timestamp: pino.stdTimeFunctions.isoTime,
+  },
+  destinationStream
+);
+
+const httpLogger = pinoHttp({
+  logger,
+  serializers: { err: pino.stdSerializers.err },
+  customProps: (req) => {
+    const requestIdHeader = req.headers['x-request-id'];
+    const requestId = Array.isArray(requestIdHeader) ? requestIdHeader[0] : requestIdHeader;
+    return {
+      requestId: requestId || undefined,
+    };
+  },
+});
+
+const register = new Registry();
+collectDefaultMetrics({ register });
+
+const requestCounter = new Counter({
+  name: 'boards_http_requests_total',
+  help: 'Total number of HTTP requests processed.',
+  labelNames: ['method', 'route', 'status_code'],
+  registers: [register],
+});
+
+const requestDuration = new Histogram({
+  name: 'boards_http_request_duration_seconds',
+  help: 'HTTP request duration in seconds.',
+  labelNames: ['method', 'route', 'status_code'],
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+  registers: [register],
+});
+
+const recommendationLatency = new Histogram({
+  name: 'boards_recommendation_scoring_duration_seconds',
+  help: 'Time spent scoring recommendation responses.',
+  labelNames: ['result'],
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+  registers: [register],
+});
 
 // Cloudinary config
 if (process.env.CLOUDINARY_CLOUD_NAME) {
@@ -76,8 +143,35 @@ app.use((req, res, next) => {
 
 app.use(cors(corsOptionsDelegate));
 app.options('*', cors(corsOptionsDelegate));
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(httpLogger);
+
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const route = req.route
+      ? `${req.baseUrl || ''}${req.route.path}`
+      : req.originalUrl.split('?')[0];
+    const labels = {
+      method: req.method,
+      route,
+      status_code: String(res.statusCode),
+    };
+    requestCounter.inc(labels);
+    const durationSeconds = Number(process.hrtime.bigint() - start) / 1e9;
+    requestDuration.observe(labels, durationSeconds);
+  });
+  next();
+});
+
 app.use(express.json({ limit: '1mb' }));
+
+app.get(
+  '/metrics',
+  asyncHandler(async (req, res) => {
+    res.set('Content-Type', register.contentType);
+    res.send(await register.metrics());
+  })
+);
 
 // ===============
 // Helpers
@@ -879,62 +973,71 @@ app.post(
 
     const searchVibes = new Set([...(user.vibePrefs || []), ...vibes]);
 
-    const scored = events
-      .map((event) => {
-        const distanceKm = calculateDistance(location.lat, location.lng, event.latitude, event.longitude);
-        if (distanceKm != null && distanceKm > radiusKm) {
-          return null;
-        }
+    let scored;
+    const stopRecommendationTimer = recommendationLatency.startTimer();
+    try {
+      scored = events
+        .map((event) => {
+          const distanceKm = calculateDistance(location.lat, location.lng, event.latitude, event.longitude);
+          if (distanceKm != null && distanceKm > radiusKm) {
+            return null;
+          }
 
-        const vibeOverlap = event.vibe.reduce(
-          (count, tag) => (searchVibes.has(tag) ? count + 1 : count),
-          0
-        );
-        const vibeScore = vibeOverlap * weights.vibe;
+          const vibeOverlap = event.vibe.reduce(
+            (count, tag) => (searchVibes.has(tag) ? count + 1 : count),
+            0
+          );
+          const vibeScore = vibeOverlap * weights.vibe;
 
-        const distanceScore = distanceKm != null ? weights.distance * Math.max(0, 1 - distanceKm / Math.max(radiusKm, 1)) : 0;
+          const distanceScore =
+            distanceKm != null ? weights.distance * Math.max(0, 1 - distanceKm / Math.max(radiusKm, 1)) : 0;
 
-        const timeBucket = bucketByWhen(event.startTime, when || null);
-        let timeScore = 0;
-        if (timeBucket === 'now') timeScore = weights.time;
-        else if (timeBucket === 'tonight') timeScore = weights.time * 0.75;
-        else if (timeBucket === 'weekend') timeScore = weights.time * 0.6;
-        else timeScore = weights.time * 0.4;
+          const timeBucket = bucketByWhen(event.startTime, when || null);
+          let timeScore = 0;
+          if (timeBucket === 'now') timeScore = weights.time;
+          else if (timeBucket === 'tonight') timeScore = weights.time * 0.75;
+          else if (timeBucket === 'weekend') timeScore = weights.time * 0.6;
+          else timeScore = weights.time * 0.4;
 
-        const popularityScore = (event.popularityScore || 0) + (event._count?.rsvps || 0) * 0.1;
-        const trustScore = event.host?.trustScore || event.trustScore || 0.5;
+          const popularityScore = (event.popularityScore || 0) + (event._count?.rsvps || 0) * 0.1;
+          const trustScore = event.host?.trustScore || event.trustScore || 0.5;
 
-        const cosine = cosineSimilarity(userVector, event.embedding?.vector);
-        const embedScore = cosine * weights.embed;
+          const cosine = cosineSimilarity(userVector, event.embedding?.vector);
+          const embedScore = cosine * weights.embed;
 
-        const total =
-          vibeScore +
-          distanceScore +
-          timeScore +
-          popularityScore * weights.popularity +
-          trustScore * weights.trust +
-          embedScore;
+          const total =
+            vibeScore +
+            distanceScore +
+            timeScore +
+            popularityScore * weights.popularity +
+            trustScore * weights.trust +
+            embedScore;
 
-        const reasons = buildReasons({
-          vibeOverlap,
-          distanceKm,
-          radiusKm,
-          timeBucket,
-          hostTrust: trustScore,
-          popularity: popularityScore,
-          cosine,
-        });
+          const reasons = buildReasons({
+            vibeOverlap,
+            distanceKm,
+            radiusKm,
+            timeBucket,
+            hostTrust: trustScore,
+            popularity: popularityScore,
+            cosine,
+          });
 
-        return {
-          ...event,
-          distanceKm,
-          score: Number(total.toFixed(3)),
-          reasons,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, Math.min(max, 50));
+          return {
+            ...event,
+            distanceKm,
+            score: Number(total.toFixed(3)),
+            reasons,
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, Math.min(max, 50));
+      stopRecommendationTimer({ result: 'success' });
+    } catch (error) {
+      stopRecommendationTimer({ result: 'error' });
+      throw error;
+    }
 
     res.json({
       generatedAt: new Date().toISOString(),
@@ -1013,17 +1116,21 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'Invalid JSON payload' });
   }
 
-  console.error('Unhandled error:', err);
+  if (req?.log) {
+    req.log.error({ err }, 'Unhandled error');
+  } else {
+    logger.error({ err }, 'Unhandled error');
+  }
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
-  console.log(`🎪 Boards API running on port ${PORT}`);
+  logger.info({ port: PORT }, 'Boards API listening');
 });
 
 async function shutdown() {
-  console.log('Gracefully shutting down');
+  logger.info('Gracefully shutting down');
   await prisma.$disconnect();
   server.close(() => {
     process.exit(0);

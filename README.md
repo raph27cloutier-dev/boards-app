@@ -26,6 +26,8 @@ CLOUDINARY_CLOUD_NAME="your-cloud"
 CLOUDINARY_API_KEY="your-key"
 CLOUDINARY_API_SECRET="your-secret"
 CORS_ALLOWLIST="https://boards.app,https://studio.boards.app" # optional
+LOG_LEVEL="info"                                 # optional structured log level
+LOG_DESTINATION="stdout"                         # stdout, stderr, or file:/path/to/boards-api.ndjson
 ```
 
 The recommendation weights can be tuned via:
@@ -40,6 +42,18 @@ W_EMBED=1
 ```
 
 If you omit `CLOUDINARY_*` variables the API will still run, but file uploads will respond with `Uploads unavailable`.
+
+### Observability
+
+- **Logs.** All API logs are structured JSON emitted through Pino. By default (`LOG_DESTINATION=stdout`) they surface in the
+  [Railway › Boards Backend › Logs](https://railway.app/project/boards/service/backend/logs) console. Point
+  `LOG_DESTINATION` to a file (e.g. `file:/var/log/boards-api.ndjson`) if you ship logs via Fluent Bit, Vector, or another
+  agent. The Grafana/Loki log dashboard lives at
+  [observability.boards.app/d/boards-logs/boards-api](https://observability.boards.app/d/boards-logs/boards-api).
+- **Metrics.** Prometheus-compatible metrics (request counts, latencies, and recommendation scoring duration) are exposed at
+  `GET /metrics`. Our Grafana operational view is available at
+  [observability.boards.app/d/boards-api/overview](https://observability.boards.app/d/boards-api/overview) and includes panels
+  for `boards_http_request_duration_seconds` and `boards_recommendation_scoring_duration_seconds`.
 
 ### Database setup & seeding
 
