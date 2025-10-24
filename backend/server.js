@@ -38,10 +38,9 @@ const corsOptionsDelegate = (req, callback) => {
 
   if (!origin) {
     callback(null, {
-      origin: true,
+      origin: false,
       credentials: true,
       allowedHeaders: commonHeaders,
-      methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'],
     });
     return;
   }
@@ -51,7 +50,7 @@ const corsOptionsDelegate = (req, callback) => {
       origin: true,
       credentials: true,
       allowedHeaders: commonHeaders,
-      methods: ['GET', 'HEAD', 'OPTIONS'],
+      methods: ['GET', 'OPTIONS'],
     });
     return;
   }
@@ -406,7 +405,7 @@ app.get(
 app.get(
   '/api/events',
   asyncHandler(async (req, res) => {
-    const { near, lat, lng, radius, radiusKm, vibe, vibes, search } = req.query;
+    const { lat, lng, radius, vibe, search } = req.query;
 
     const where = {};
 
@@ -415,21 +414,8 @@ app.get(
       where.startTime = timeRange;
     }
 
-    const vibeTags = new Set();
     if (vibe) {
       vibeTags.add(String(vibe));
-    }
-    const rawVibes = Array.isArray(vibes) ? vibes : vibes ? [vibes] : [];
-    rawVibes.forEach((value) => {
-      String(value)
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-        .forEach((tag) => vibeTags.add(tag));
-    });
-
-    if (vibeTags.size) {
-      where.vibe = { hasSome: Array.from(vibeTags) };
     }
 
     if (search) {
@@ -439,30 +425,6 @@ app.get(
         { neighborhood: { contains: search, mode: 'insensitive' } },
       ];
     }
-
-    const location = (() => {
-      if (near) {
-        const [nearLat, nearLng] = String(near)
-          .split(',')
-          .map((value) => parseFloat(value.trim()));
-        if (!Number.isNaN(nearLat) && !Number.isNaN(nearLng)) {
-          return { lat: nearLat, lng: nearLng };
-        }
-      }
-      if (lat != null && lng != null) {
-        const parsedLat = parseFloat(lat);
-        const parsedLng = parseFloat(lng);
-        if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
-          return { lat: parsedLat, lng: parsedLng };
-        }
-      }
-      return null;
-    })();
-
-    const parsedRadius = [radiusKm, radius]
-      .map((value) => (value != null ? parseFloat(value) : NaN))
-      .find((value) => !Number.isNaN(value) && value > 0);
-    const maxRadiusKm = parsedRadius || (location ? 10 : null);
 
     let events = await prisma.event.findMany({
       where,
@@ -481,16 +443,18 @@ app.get(
       orderBy: { startTime: 'asc' },
     });
 
-    if (location) {
+    if (lat && lng) {
+      const userLat = parseFloat(lat);
+      const userLng = parseFloat(lng);
+      const maxRadius = radius ? parseFloat(radius) : 10;
+
       events = events
         .map((event) => {
-          const distanceKm = calculateDistance(location.lat, location.lng, event.latitude, event.longitude);
-          return { ...event, distanceKm };
+          const distance = calculateDistance(userLat, userLng, event.latitude, event.longitude);
+          return { ...event, distance };
         })
-        .filter((event) =>
-          maxRadiusKm != null ? event.distanceKm != null && event.distanceKm <= maxRadiusKm : event.distanceKm != null
-        )
-        .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+        .filter((event) => event.distance != null && event.distance <= maxRadius)
+        .sort((a, b) => a.distance - b.distance);
     }
 
     res.json(events);
