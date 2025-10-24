@@ -10,55 +10,64 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  username      String   @unique
-  passwordHash  String
-  displayName   String
-  bio           String?
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  id               String   @id @default(uuid())
+  email            String   @unique
+  username         String   @unique
+  passwordHash     String
+  displayName      String
+  bio              String?
+  avatarUrl        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  vibePrefs        String[] @default([])
+  homeNeighborhood String?
+  tasteVector      Float[]  @default([])
+  trustScore       Float    @default(0.5)
+
   // Relations
-  events        Event[]
-  rsvps         RSVP[]
-  followers     Follow[] @relation("Following")
-  following     Follow[] @relation("Followers")
-  
+  events       Event[]
+  rsvps        RSVP[]
+  followers    Follow[]      @relation("Following")
+  following    Follow[]      @relation("Followers")
+  interactions Interaction[]
+
   @@map("users")
 }
 
 model Event {
-  id              String    @id @default(uuid())
-  title           String
-  description     String
-  imageUrl        String
-  startTime       DateTime
-  endTime         DateTime?
-  
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  imageUrl    String
+  startTime   DateTime
+  endTime     DateTime?
+
   // Location
-  venueName       String?
-  address         String
-  neighborhood    String
-  latitude        Float
-  longitude       Float
-  
+  venueName    String?
+  address      String
+  neighborhood String
+  latitude     Float
+  longitude    Float
+
   // Metadata
-  vibe            String[]  // ["Loud", "Wild", "Creative"]
-  eventType       String    // "party", "concert", "market", etc.
+  vibe            String[] // ["Loud", "Wild", "Creative"]
+  eventType       String // "party", "concert", "market", etc.
   capacity        Int?
-  ageRestriction  String?   // "All ages", "19+", "21+"
+  ageRestriction  String? // "All ages", "19+", "21+"
   ticketLink      String?
-  
+  popularityScore Float    @default(0)
+  trustScore      Float    @default(0.5)
+
   // Relations
-  hostId          String
-  host            User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  rsvps           RSVP[]
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  hostId       String
+  host         User            @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  rsvps        RSVP[]
+  interactions Interaction[]
+  embedding    EventEmbedding?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([startTime])
   @@index([neighborhood])
   @@index([latitude, longitude])
@@ -71,10 +80,10 @@ model RSVP {
   eventId   String
   status    String   @default("going") // "going", "interested", "maybe"
   createdAt DateTime @default(now())
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
   @@unique([userId, eventId])
   @@index([eventId])
   @@map("rsvps")
@@ -85,11 +94,38 @@ model Follow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
-  
-  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
-  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
-  
+
+  follower  User @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
   @@unique([followerId, followingId])
   @@index([followingId])
   @@map("follows")
+}
+
+model EventEmbedding {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  vector      Float[]
+  generatedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_embeddings")
+}
+
+model Interaction {
+  id        String   @id @default(uuid())
+  userId    String
+  eventId   String
+  action    String
+  dwellMs   Int?
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([eventId])
+  @@map("interactions")
 }

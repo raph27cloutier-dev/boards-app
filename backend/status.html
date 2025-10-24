@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boards Status</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #040309;
+      --card-bg: rgba(18, 16, 32, 0.9);
+      --accent: #f72585;
+      --text: #f4f2ff;
+      --muted: #9aa0c2;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top left, #1d1038, var(--bg) 45%);
+      color: var(--text);
+      padding: 48px 16px 64px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      max-width: 960px;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    p.description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .controls {
+      max-width: 960px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .controls button {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.68rem;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .controls button.active {
+      background: rgba(247, 37, 133, 0.18);
+      border-color: rgba(247, 37, 133, 0.6);
+      color: var(--accent);
+    }
+
+    .controls .note {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    #events {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card-bg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(circle, rgba(247, 37, 133, 0.12), transparent 55%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      background: rgba(247, 37, 133, 0.16);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 4px 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .vibes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .vibes span {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .loading,
+    .error {
+      width: 100%;
+      max-width: 960px;
+      border-radius: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.16);
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      margin-top: 32px;
+    }
+
+    .reasons {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .reasons li {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 3px 8px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Boards Pulse</h1>
+    <p class="description">Live snapshot of Montréal happenings. Data sourced straight from the Boards API.</p>
+  </header>
+
+  <section id="controls" class="controls">
+    <button type="button" data-mode="feed" class="active">All events</button>
+    <button type="button" data-mode="reco">Recommended for me</button>
+    <span class="note">Demo pulls for raph@boards.app</span>
+  </section>
+
+  <section id="events"></section>
+  <div id="status" class="loading">Loading events...</div>
+
+  <footer>Boards · Hyperlocal happenings · Montréal</footer>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const eventsEl = document.getElementById('events');
+    const controlsEl = document.getElementById('controls');
+
+    const DEFAULT_LOCATION = { lat: 45.52, lng: -73.57 };
+
+    let mode = 'feed';
+    let feedCache = [];
+    let recoCache = null;
+    let demoUserId = null;
+
+    function setStatus(message, variant = 'loading') {
+      statusEl.textContent = message;
+      statusEl.className = variant;
+    }
+
+    function renderEvents(events, { showReasons = false } = {}) {
+      eventsEl.innerHTML = '';
+
+      if (!Array.isArray(events) || events.length === 0) {
+        if (mode === 'feed') {
+          setStatus('No events yet — run the seed to populate Montréal demos.');
+        } else {
+          setStatus('No personalised picks yet. Try seeding and recording feedback.');
+        }
+        return;
+      }
+
+      setStatus(`${events.length} happenings`);
+
+      events.forEach((event) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = new Date(event.startTime).toLocaleString('en-CA', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        card.appendChild(badge);
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = event.title;
+        card.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const neighborhood = event.neighborhood || 'Montreal';
+        const venue = event.venueName || 'Pop-up location';
+        const host = event.host?.displayName || 'Unknown';
+        const distance = event.distanceKm ?? event.distance;
+        const distanceCopy =
+          typeof distance === 'number' && Number.isFinite(distance)
+            ? ` · ${distance.toFixed(1)} km away`
+            : '';
+        meta.innerHTML = `
+          <span>${neighborhood} · ${venue}${distanceCopy}</span>
+          <span>Host: ${host}</span>
+        `;
+        card.appendChild(meta);
+
+        const vibes = document.createElement('div');
+        vibes.className = 'vibes';
+        (event.vibe || []).forEach((tag) => {
+          const chip = document.createElement('span');
+          chip.textContent = tag;
+          vibes.appendChild(chip);
+        });
+        card.appendChild(vibes);
+
+        if (showReasons) {
+          const reasons = Array.isArray(event.reasons) ? event.reasons.filter(Boolean) : [];
+          if (reasons.length) {
+            const list = document.createElement('ul');
+            list.className = 'reasons';
+            reasons.forEach((reason) => {
+              const item = document.createElement('li');
+              item.textContent = reason;
+              list.appendChild(item);
+            });
+            card.appendChild(list);
+          }
+        }
+
+        eventsEl.appendChild(card);
+      });
+    }
+
+    async function loadFeed() {
+      try {
+        setStatus('Loading events...');
+        const response = await fetch('/api/events');
+        if (!response.ok) {
+          throw new Error('Failed to load events');
+        }
+        const events = await response.json();
+        feedCache = Array.isArray(events) ? events : [];
+        if (!demoUserId) {
+          demoUserId = feedCache.find((event) => event.host?.id)?.host?.id || null;
+        }
+        renderEvents(feedCache);
+      } catch (error) {
+        console.error(error);
+        setStatus('Could not load events. Check the API logs or try again.', 'error');
+      }
+    }
+
+    async function loadRecommendations(force = false) {
+      try {
+        if (!demoUserId) {
+          await loadFeed();
+        }
+        if (!demoUserId) {
+          setStatus('No demo user available for recommendations yet. Seed the database first.', 'error');
+          return;
+        }
+
+        if (!force && Array.isArray(recoCache)) {
+          renderEvents(recoCache, { showReasons: true });
+          return;
+        }
+
+        setStatus('Pulling personalised picks...');
+        const response = await fetch('/api/reco/feed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: demoUserId,
+            location: DEFAULT_LOCATION,
+            radiusKm: 12,
+            when: 'weekend',
+            max: 12,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load recommendations');
+        }
+
+        const data = await response.json();
+        recoCache = Array.isArray(data?.events) ? data.events : [];
+        renderEvents(recoCache, { showReasons: true });
+      } catch (error) {
+        console.error(error);
+        setStatus('Could not load recommendations. Confirm the API is running and seeded.', 'error');
+      }
+    }
+
+    function setMode(nextMode) {
+      if (mode === nextMode) return;
+      mode = nextMode;
+      controlsEl.querySelectorAll('button[data-mode]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.mode === mode);
+      });
+      if (mode === 'feed') {
+        renderEvents(feedCache);
+      } else {
+        loadRecommendations();
+      }
+    }
+
+    controlsEl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-mode]');
+      if (!button) return;
+      if (button.dataset.mode === 'feed') {
+        setMode('feed');
+      } else if (button.dataset.mode === 'reco') {
+        setMode('reco');
+      }
+    });
+
+    loadFeed();
+  </script>
+</body>
+</html>
