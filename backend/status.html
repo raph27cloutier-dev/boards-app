@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boards Status</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #040309;
+      --card-bg: rgba(18, 16, 32, 0.9);
+      --accent: #f72585;
+      --text: #f4f2ff;
+      --muted: #9aa0c2;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top left, #1d1038, var(--bg) 45%);
+      color: var(--text);
+      padding: 48px 16px 64px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      max-width: 960px;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    p.description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    #events {
+      width: 100%;
+      max-width: 960px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card-bg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(circle, rgba(247, 37, 133, 0.12), transparent 55%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      background: rgba(247, 37, 133, 0.16);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 4px 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .vibes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .vibes span {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .loading,
+    .error {
+      width: 100%;
+      max-width: 960px;
+      border-radius: 12px;
+      border: 1px dashed rgba(255, 255, 255, 0.16);
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      margin-top: 32px;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Boards Pulse</h1>
+    <p class="description">Live snapshot of Montréal happenings. Data sourced straight from the Boards API.</p>
+  </header>
+
+  <section id="events"></section>
+  <div id="status" class="loading">Loading events...</div>
+
+  <footer>Boards · Hyperlocal happenings · Montréal</footer>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const eventsEl = document.getElementById('events');
+
+    async function loadEvents() {
+      try {
+        const response = await fetch('/api/events');
+        if (!response.ok) {
+          throw new Error('Failed to load events');
+        }
+        const events = await response.json();
+        if (!Array.isArray(events) || events.length === 0) {
+          statusEl.textContent = 'No events in the feed yet — run the seed script to populate Montréal demos.';
+          statusEl.className = 'loading';
+          return;
+        }
+
+        statusEl.remove();
+        events.forEach((event) => {
+          const card = document.createElement('article');
+          card.className = 'card';
+
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = new Date(event.startTime).toLocaleString('en-CA', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          card.appendChild(badge);
+
+          const title = document.createElement('div');
+          title.className = 'title';
+          title.textContent = event.title;
+          card.appendChild(title);
+
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.innerHTML = `
+            <span>${event.neighborhood || 'Montreal'} · ${event.venueName || 'Pop-up location'}</span>
+            <span>Host: ${event.host?.displayName || 'Unknown'}</span>
+          `;
+          card.appendChild(meta);
+
+          const vibes = document.createElement('div');
+          vibes.className = 'vibes';
+          (event.vibe || []).forEach((tag) => {
+            const chip = document.createElement('span');
+            chip.textContent = tag;
+            vibes.appendChild(chip);
+          });
+          card.appendChild(vibes);
+
+          eventsEl.appendChild(card);
+        });
+      } catch (error) {
+        statusEl.textContent = 'Could not load events. Check the API logs or try again.';
+        statusEl.className = 'error';
+      }
+    }
+
+    loadEvents();
+  </script>
+</body>
+</html>
