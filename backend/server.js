@@ -415,7 +415,7 @@ app.get(
     }
 
     if (vibe) {
-      where.vibe = { has: vibe };
+      vibeTags.add(String(vibe));
     }
 
     if (search) {
