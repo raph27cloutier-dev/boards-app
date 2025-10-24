@@ -38,9 +38,10 @@ const corsOptionsDelegate = (req, callback) => {
 
   if (!origin) {
     callback(null, {
-      origin: false,
+      origin: true,
       credentials: true,
       allowedHeaders: commonHeaders,
+      methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'],
     });
     return;
   }
@@ -50,7 +51,7 @@ const corsOptionsDelegate = (req, callback) => {
       origin: true,
       credentials: true,
       allowedHeaders: commonHeaders,
-      methods: ['GET', 'OPTIONS'],
+      methods: ['GET', 'HEAD', 'OPTIONS'],
     });
     return;
   }
