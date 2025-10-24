@@ -8,6 +8,13 @@ const path = require('path');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { PrismaClient } = require('@prisma/client');
+const { ZodError } = require('zod');
+const {
+  validateEventCreate,
+  validateEventUpdate,
+  validateRecommendationInput,
+  validateImageMimeType,
+} = require('./validation');
 require('dotenv').config();
 
 const app = express();
@@ -136,17 +143,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
-}
-
-function parseVibeInput(vibeInput) {
-  if (!vibeInput) return [];
-  if (Array.isArray(vibeInput)) return vibeInput;
-  try {
-    const parsed = JSON.parse(vibeInput);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    throw new Error('Invalid vibe payload');
-  }
 }
 
 function buildTimeFilter(query) {
@@ -543,32 +539,13 @@ app.post(
   authenticate,
   upload.single('image'),
   asyncHandler(async (req, res) => {
-    const {
-      title,
-      description,
-      startTime,
-      endTime,
-      venueName,
-      address,
-      neighborhood,
-      latitude,
-      longitude,
-      vibe,
-      eventType,
-      capacity,
-      ageRestriction,
-      ticketLink,
-    } = req.body;
-
-    if (!title || !startTime || !address || !latitude || !longitude) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
+    const payload = validateEventCreate(req.body);
     let imageUrl = '';
 
     if (req.file) {
+      validateImageMimeType(req.file);
       if (!cloudinary.config().cloud_name) {
-        return res.status(500).json({ error: 'Uploads unavailable' });
+        return res.status(503).json({ error: 'Uploads unavailable' });
       }
 
       const uploadResult = await new Promise((resolve, reject) => {
@@ -585,25 +562,23 @@ app.post(
       imageUrl = uploadResult.secure_url;
     }
 
-    const vibeArray = parseVibeInput(vibe);
-
     const event = await prisma.event.create({
       data: {
-        title,
-        description: description || '',
+        title: payload.title,
+        description: payload.description || '',
         imageUrl,
-        startTime: new Date(startTime),
-        endTime: endTime ? new Date(endTime) : null,
-        venueName,
-        address,
-        neighborhood: neighborhood || req.user.homeNeighborhood || 'Montreal',
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        vibe: vibeArray,
-        eventType: eventType || 'other',
-        capacity: capacity ? parseInt(capacity, 10) : null,
-        ageRestriction,
-        ticketLink,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+        venueName: payload.venueName,
+        address: payload.address,
+        neighborhood: payload.neighborhood || req.user.homeNeighborhood || 'Montreal',
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        vibe: payload.vibe,
+        eventType: payload.eventType,
+        capacity: payload.capacity,
+        ageRestriction: payload.ageRestriction,
+        ticketLink: payload.ticketLink,
         hostId: req.user.id,
       },
       include: {
@@ -638,38 +613,7 @@ app.put(
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    const updatableFields = [
-      'title',
-      'description',
-      'startTime',
-      'endTime',
-      'venueName',
-      'address',
-      'neighborhood',
-      'latitude',
-      'longitude',
-      'vibe',
-      'eventType',
-      'capacity',
-      'ageRestriction',
-      'ticketLink',
-    ];
-
-    const data = {};
-    for (const field of updatableFields) {
-      if (req.body[field] === undefined) continue;
-      if (field === 'startTime' || field === 'endTime') {
-        data[field] = req.body[field] ? new Date(req.body[field]) : null;
-      } else if (field === 'latitude' || field === 'longitude') {
-        data[field] = parseFloat(req.body[field]);
-      } else if (field === 'capacity') {
-        data[field] = req.body[field] != null ? parseInt(req.body[field], 10) : null;
-      } else if (field === 'vibe') {
-        data[field] = parseVibeInput(req.body[field]);
-      } else {
-        data[field] = req.body[field];
-      }
-    }
+    const data = validateEventUpdate(req.body);
 
     const updated = await prisma.event.update({
       where: { id: req.params.id },
@@ -818,11 +762,7 @@ app.get(
 app.post(
   '/api/reco/feed',
   asyncHandler(async (req, res) => {
-    const { userId, location, radiusKm = 10, when, vibes = [], max = 20 } = req.body || {};
-
-    if (!userId || !location || location.lat == null || location.lng == null) {
-      return res.status(400).json({ error: 'userId and location.lat/lng are required' });
-    }
+    const { userId, location, radiusKm, when, vibes, max } = validateRecommendationInput(req.body);
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -1011,6 +951,16 @@ app.use((err, req, res, next) => {
 
   if (err instanceof SyntaxError && 'body' in err) {
     return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
+
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: err.issues.map((issue) => ({
+        path: issue.path.join('.') || 'root',
+        message: issue.message,
+      })),
+    });
   }
 
   console.error('Unhandled error:', err);
