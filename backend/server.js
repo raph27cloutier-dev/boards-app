@@ -516,6 +516,11 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Manual seed endpoint
+app.get('/api/seed', async (req, res) => {
+  // ... seed code here ...
+});
+
 // ============================================
 // START SERVER
 // ============================================
