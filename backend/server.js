@@ -15,6 +15,12 @@ const {
   validateRecommendationInput,
   validateImageMimeType,
 } = require('./validation');
+const {
+  generateEventEmbedding,
+  computeUserTasteVector,
+  cosineSimilarity: cosineSim,
+  explainEmbedding,
+} = require('./embeddings');
 require('dotenv').config();
 
 const app = express();
@@ -203,14 +209,8 @@ function buildTimeFilter(query) {
   return window;
 }
 
-function cosineSimilarity(a = [], b = []) {
-  if (!a.length || !b.length || a.length !== b.length) return 0;
-  const dot = a.reduce((sum, value, index) => sum + value * b[index], 0);
-  const normA = Math.sqrt(a.reduce((sum, value) => sum + value * value, 0));
-  const normB = Math.sqrt(b.reduce((sum, value) => sum + value * value, 0));
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (normA * normB);
-}
+// Cosine similarity function now imported from embeddings.js
+// Using cosineSim as alias to avoid conflicts
 
 function buildReasons({
   vibeOverlap,
@@ -844,7 +844,7 @@ app.post(
         const popularityScore = (event.popularityScore || 0) + (event._count?.rsvps || 0) * 0.1;
         const trustScore = event.host?.trustScore || event.trustScore || 0.5;
 
-        const cosine = cosineSimilarity(userVector, event.embedding?.vector);
+        const cosine = cosineSim(userVector, event.embedding?.vector);
         const embedScore = cosine * weights.embed;
 
         const total =
@@ -933,6 +933,226 @@ app.post(
     }
 
     res.status(201).json({ success: true, interaction });
+  })
+);
+
+// ===============
+// Embedding & Taste Vector Management (Phase B)
+// ===============
+
+// Generate embedding for a single event
+app.post(
+  '/api/embeddings/generate/:eventId',
+  asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
+
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const vector = generateEventEmbedding(event);
+
+    const embedding = await prisma.eventEmbedding.upsert({
+      where: { eventId },
+      create: {
+        eventId,
+        vector,
+      },
+      update: {
+        vector,
+        generatedAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      eventId,
+      embedding: {
+        id: embedding.id,
+        vector: embedding.vector,
+        generatedAt: embedding.generatedAt,
+      },
+      explanation: explainEmbedding(vector),
+    });
+  })
+);
+
+// Batch generate embeddings for all events (or filtered set)
+app.post(
+  '/api/embeddings/batch',
+  asyncHandler(async (req, res) => {
+    const { eventIds, regenerateAll = false } = req.body || {};
+
+    let whereClause = {};
+    if (Array.isArray(eventIds) && eventIds.length > 0) {
+      whereClause = { id: { in: eventIds } };
+    } else if (!regenerateAll) {
+      // Default: only generate for events without embeddings
+      const eventsWithEmbeddings = await prisma.eventEmbedding.findMany({
+        select: { eventId: true },
+      });
+      const eventIdsWithEmbeddings = eventsWithEmbeddings.map(e => e.eventId);
+      whereClause = { id: { notIn: eventIdsWithEmbeddings } };
+    }
+
+    const events = await prisma.event.findMany({
+      where: whereClause,
+    });
+
+    const results = [];
+    for (const event of events) {
+      const vector = generateEventEmbedding(event);
+      const embedding = await prisma.eventEmbedding.upsert({
+        where: { eventId: event.id },
+        create: {
+          eventId: event.id,
+          vector,
+        },
+        update: {
+          vector,
+          generatedAt: new Date(),
+        },
+      });
+      results.push({
+        eventId: event.id,
+        embeddingId: embedding.id,
+        title: event.title,
+      });
+    }
+
+    res.json({
+      success: true,
+      generated: results.length,
+      results,
+    });
+  })
+);
+
+// Compute and update user taste vector from interaction history
+app.post(
+  '/api/users/:userId/taste-vector',
+  asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { actionWeights, recencyDecay, decayHalfLifeDays } = req.body || {};
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Fetch user interactions with event embeddings
+    const interactions = await prisma.interaction.findMany({
+      where: { userId },
+      include: {
+        event: {
+          include: {
+            embedding: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (interactions.length === 0) {
+      return res.json({
+        success: true,
+        userId,
+        tasteVector: [],
+        interactionCount: 0,
+        message: 'No interactions found - taste vector not updated',
+      });
+    }
+
+    const options = {};
+    if (actionWeights) options.actionWeights = actionWeights;
+    if (recencyDecay !== undefined) options.recencyDecay = recencyDecay;
+    if (decayHalfLifeDays) options.decayHalfLifeDays = decayHalfLifeDays;
+
+    const tasteVector = computeUserTasteVector(interactions, options);
+
+    // Update user's taste vector
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tasteVector },
+    });
+
+    res.json({
+      success: true,
+      userId,
+      tasteVector,
+      interactionCount: interactions.length,
+      explanation: explainEmbedding(tasteVector),
+    });
+  })
+);
+
+// Batch update taste vectors for all users (or filtered set)
+app.post(
+  '/api/embeddings/batch-users',
+  asyncHandler(async (req, res) => {
+    const { userIds, minInteractions = 1 } = req.body || {};
+
+    let whereClause = {};
+    if (Array.isArray(userIds) && userIds.length > 0) {
+      whereClause = { id: { in: userIds } };
+    }
+
+    const users = await prisma.user.findMany({
+      where: whereClause,
+    });
+
+    const results = [];
+    for (const user of users) {
+      const interactions = await prisma.interaction.findMany({
+        where: { userId: user.id },
+        include: {
+          event: {
+            include: {
+              embedding: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (interactions.length < minInteractions) {
+        results.push({
+          userId: user.id,
+          username: user.username,
+          skipped: true,
+          reason: `Only ${interactions.length} interactions (min: ${minInteractions})`,
+        });
+        continue;
+      }
+
+      const tasteVector = computeUserTasteVector(interactions);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tasteVector },
+      });
+
+      results.push({
+        userId: user.id,
+        username: user.username,
+        updated: true,
+        interactionCount: interactions.length,
+      });
+    }
+
+    res.json({
+      success: true,
+      processed: results.length,
+      updated: results.filter(r => r.updated).length,
+      skipped: results.filter(r => r.skipped).length,
+      results,
+    });
   })
 );
 

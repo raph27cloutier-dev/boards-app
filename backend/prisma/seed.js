@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { generateEventEmbedding } = require('../embeddings.js');
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/halloween-rager',
     popularityScore: 2.5,
     trustScore: 0.6,
-    embedding: [0.82, 0.63, 0.55, 0.41, 0.23],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb002',
@@ -48,7 +48,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/sunrise-sound-bath',
     popularityScore: 1.2,
     trustScore: 0.7,
-    embedding: [0.22, 0.71, 0.64, 0.18, 0.09],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb003',
@@ -70,7 +69,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/vinyl-club',
     popularityScore: 1.8,
     trustScore: 0.65,
-    embedding: [0.68, 0.44, 0.59, 0.33, 0.27],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb004',
@@ -92,7 +90,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/plateau-night-market',
     popularityScore: 2.1,
     trustScore: 0.7,
-    embedding: [0.51, 0.36, 0.47, 0.72, 0.42],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb005',
@@ -114,7 +111,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/griffintown-murals',
     popularityScore: 1.5,
     trustScore: 0.62,
-    embedding: [0.35, 0.66, 0.52, 0.29, 0.31],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb006',
@@ -136,7 +132,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/ndg-backyard-jazz',
     popularityScore: 1.1,
     trustScore: 0.58,
-    embedding: [0.26, 0.62, 0.49, 0.21, 0.18],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb007',
@@ -158,7 +153,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/mile-end-maker-lab',
     popularityScore: 1.4,
     trustScore: 0.66,
-    embedding: [0.44, 0.58, 0.61, 0.35, 0.4],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb008',
@@ -180,7 +174,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/underground-boiler-room',
     popularityScore: 3.1,
     trustScore: 0.55,
-    embedding: [0.91, 0.38, 0.47, 0.24, 0.19],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb009',
@@ -202,7 +195,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/pasta-club',
     popularityScore: 1.9,
     trustScore: 0.64,
-    embedding: [0.29, 0.69, 0.53, 0.31, 0.22],
   },
   {
     id: '7398c6f1-651c-4c91-9c4d-1f0a3f5fb010',
@@ -224,7 +216,6 @@ const eventBlueprints = [
     ticketLink: 'https://boards.app/events/hochelaga-jam',
     popularityScore: 2.3,
     trustScore: 0.6,
-    embedding: [0.77, 0.49, 0.58, 0.37, 0.28],
   },
 ];
 
@@ -242,7 +233,6 @@ async function main() {
     update: {
       displayName: 'Raph',
       bio: 'Founder of Boards',
-      tasteVector: [0.55, 0.62, 0.58, 0.34, 0.31],
       vibePrefs: ['Creative', 'Wild', 'Chill'],
       homeNeighborhood: 'Plateau Mont-Royal',
       trustScore: 0.7,
@@ -253,7 +243,6 @@ async function main() {
       passwordHash: passwordHash,
       displayName: 'Raph',
       bio: 'Founder of Boards',
-      tasteVector: [0.55, 0.62, 0.58, 0.34, 0.31],
       vibePrefs: ['Creative', 'Wild', 'Chill'],
       homeNeighborhood: 'Plateau Mont-Royal',
       trustScore: 0.7,
@@ -314,14 +303,16 @@ async function main() {
       },
     });
 
+    // Generate embedding from event data (Phase B)
+    const embedding = generateEventEmbedding(event);
     await prisma.eventEmbedding.upsert({
       where: { eventId: event.id },
       update: {
-        vector: blueprint.embedding,
+        vector: embedding,
       },
       create: {
         eventId: event.id,
-        vector: blueprint.embedding,
+        vector: embedding,
       },
     });
 
