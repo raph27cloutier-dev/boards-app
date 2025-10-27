@@ -5,6 +5,8 @@ import { eventsAPI, getUserLocation } from '../lib/api';
 import type { Event } from '../types';
 import { VIBES } from '../types';
 import { format } from 'date-fns';
+import { EventListSkeleton } from '../components/LoadingSkeleton';
+import { NoEventsFound, NoSearchResults } from '../components/EmptyState';
 
 export const EventFeed: React.FC = () => {
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
@@ -61,7 +63,7 @@ export const EventFeed: React.FC = () => {
             placeholder="Search events..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg bg-dark-card border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20"
+            className="w-full px-4 py-2 rounded-lg bg-dark-card border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20 transition-all duration-300 focus:scale-105 focus:shadow-lg focus:shadow-accent-purple/20"
           />
         </div>
       </div>
@@ -72,10 +74,10 @@ export const EventFeed: React.FC = () => {
           <button
             key={vibe}
             onClick={() => toggleVibe(vibe)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            className={`filter-button ${
               selectedVibes.includes(vibe)
-                ? 'bg-accent-purple text-white'
-                : 'bg-dark-card border border-dark-border hover:border-accent-purple'
+                ? 'filter-button-active'
+                : 'filter-button-inactive'
             }`}
           >
             {vibe}
@@ -84,33 +86,32 @@ export const EventFeed: React.FC = () => {
         {selectedVibes.length > 0 && (
           <button
             onClick={() => setSelectedVibes([])}
-            className="px-4 py-2 rounded-full text-sm font-medium bg-dark-card border border-dark-border hover:border-red-500 hover:text-red-400"
+            className="px-4 py-2 rounded-full text-sm font-medium bg-dark-card border border-red-500/50 text-red-400 hover:border-red-500 hover:bg-red-500/20 transition-all duration-300 btn-press animate-scale-in"
           >
-            Clear Filters
+            Clear Filters ({selectedVibes.length})
           </button>
         )}
       </div>
 
       {/* Event Grid */}
       {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-400">Loading events...</div>
-        </div>
+        <EventListSkeleton />
       ) : error ? (
         <div className="flex justify-center items-center h-64">
-          <div className="text-red-400">Failed to load events. Please try again.</div>
+          <div className="text-red-400 animate-fade-in">Failed to load events. Please try again.</div>
         </div>
       ) : events && events.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
+          {events.map((event, index) => (
+            <EventCard key={event.id} event={event} index={index} />
           ))}
         </div>
       ) : (
-        <div className="flex flex-col justify-center items-center h-64 text-gray-400">
-          <p className="text-lg">No events found</p>
-          <p className="text-sm mt-2">Try adjusting your filters</p>
-        </div>
+        searchQuery ? (
+          <NoSearchResults searchQuery={searchQuery} />
+        ) : (
+          <NoEventsFound onClearFilters={selectedVibes.length > 0 ? () => setSelectedVibes([]) : undefined} />
+        )
       )}
     </div>
   );
@@ -118,13 +119,15 @@ export const EventFeed: React.FC = () => {
 
 interface EventCardProps {
   event: Event;
+  index: number;
 }
 
-const EventCard: React.FC<EventCardProps> = ({ event }) => {
+const EventCard: React.FC<EventCardProps> = ({ event, index }) => {
   const startDate = new Date(event.startTime);
+  const staggerClass = `stagger-${Math.min(index % 8 + 1, 8)}`;
 
   return (
-    <Link to={`/events/${event.id}`} className="poster-card group">
+    <Link to={`/events/${event.id}`} className={`poster-card group animate-slide-up ${staggerClass}`}>
       <div className="relative">
         {event.imageUrl ? (
           <img
