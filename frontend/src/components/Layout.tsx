@@ -4,150 +4,152 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
+  showBackButton?: boolean;
+  title?: string;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, isAuthenticated, logout } = useAuth();
+export const Layout: React.FC<LayoutProps> = ({ children, showBackButton = false, title }) => {
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const isActive = (path: string) => {
     return location.pathname === path;
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text">
-      {/* Navigation */}
+    <div className="min-h-screen bg-dark-bg text-dark-text pb-20">
+      {/* Top Header */}
       <nav className="sticky top-0 z-50 border-b border-dark-border bg-dark-bg/95 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="text-2xl font-bold bg-gradient-to-r from-accent-purple to-accent-pink bg-clip-text text-transparent">
-                BOARDS
-              </div>
-              <div className="text-xs text-gray-500">MTL</div>
-            </Link>
+        <div className="mx-auto max-w-2xl px-4">
+          <div className="flex h-14 items-center justify-between">
+            {/* Left: Back button or Logo */}
+            <div className="flex items-center space-x-3">
+              {showBackButton ? (
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-2 hover:bg-dark-card rounded-lg transition-colors"
+                  aria-label="Go back"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              ) : (
+                <Link to="/" className="flex items-center space-x-2">
+                  <div className="text-2xl font-bold bg-gradient-to-r from-accent-purple to-accent-pink bg-clip-text text-transparent">
+                    BOARDS
+                  </div>
+                </Link>
+              )}
+              {title && <h1 className="text-lg font-semibold">{title}</h1>}
+            </div>
 
-            {/* Navigation Links */}
+            {/* Right: User menu */}
             {isAuthenticated && (
-              <div className="hidden md:flex items-center space-x-1">
-                <NavLink to="/" active={isActive('/')}>
-                  Feed
-                </NavLink>
-                <NavLink to="/recommendations" active={isActive('/recommendations')}>
-                  For You
-                </NavLink>
-                <NavLink to="/create-event" active={isActive('/create-event')}>
-                  Create
-                </NavLink>
+              <div className="flex items-center space-x-2">
+                <Link
+                  to={`/profile/${user?.id}`}
+                  className="flex items-center space-x-2"
+                >
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.displayName || user.username}
+                      className="h-8 w-8 rounded-full border-2 border-accent-purple"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-sm font-bold">
+                      {user?.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </Link>
               </div>
             )}
-
-            {/* User Menu */}
-            <div className="flex items-center space-x-4">
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to={`/profile/${user?.id}`}
-                    className="flex items-center space-x-2 hover:opacity-80 transition-opacity"
-                  >
-                    {user?.avatarUrl ? (
-                      <img
-                        src={user.avatarUrl}
-                        alt={user.displayName || user.username}
-                        className="h-8 w-8 rounded-full border-2 border-accent-purple"
-                      />
-                    ) : (
-                      <div className="h-8 w-8 rounded-full bg-accent-purple flex items-center justify-center text-sm font-semibold">
-                        {user?.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="hidden sm:inline text-sm">
-                      {user?.displayName || user?.username}
-                    </span>
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="px-4 py-2 text-sm rounded-lg border border-dark-border hover:bg-dark-card transition-colors"
-                  >
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="px-4 py-2 text-sm rounded-lg hover:bg-dark-card transition-colors"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/signup"
-                    className="px-4 py-2 text-sm rounded-lg bg-accent-purple hover:bg-accent-purple/90 transition-colors font-medium"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
-            </div>
           </div>
-
-          {/* Mobile Navigation */}
-          {isAuthenticated && (
-            <div className="flex md:hidden space-x-1 pb-3">
-              <NavLink to="/" active={isActive('/')} mobile>
-                Feed
-              </NavLink>
-              <NavLink to="/recommendations" active={isActive('/recommendations')} mobile>
-                For You
-              </NavLink>
-              <NavLink to="/create-event" active={isActive('/create-event')} mobile>
-                Create
-              </NavLink>
-            </div>
-          )}
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-2xl">
         {children}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-dark-border mt-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-sm text-gray-500">
-            <p>Boards &copy; 2025 - Hyperlocal Happenings for Montréal</p>
+      {/* Bottom Navigation (Instagram-style) */}
+      {isAuthenticated && (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-dark-border bg-dark-bg/95 backdrop-blur">
+          <div className="mx-auto max-w-2xl px-4">
+            <div className="flex items-center justify-around h-16">
+              {/* Home */}
+              <Link
+                to="/"
+                className={`p-3 rounded-lg transition-colors ${
+                  isActive('/') ? 'text-accent-purple' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <svg className="w-7 h-7" fill={isActive('/') ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </Link>
+
+              {/* Recommendations */}
+              <Link
+                to="/recommendations"
+                className={`p-3 rounded-lg transition-colors ${
+                  isActive('/recommendations') ? 'text-accent-purple' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <svg className="w-7 h-7" fill={isActive('/recommendations') ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </Link>
+
+              {/* Create Event (Center - larger) */}
+              <Link
+                to="/create-event"
+                className="p-4 rounded-full bg-gradient-to-r from-accent-purple to-accent-pink text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                </svg>
+              </Link>
+
+              {/* Activity/Notifications */}
+              <button
+                className="p-3 rounded-lg text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+
+              {/* Profile */}
+              <Link
+                to={`/profile/${user?.id}`}
+                className={`p-2 rounded-lg transition-colors ${
+                  location.pathname.includes('/profile') ? 'text-accent-purple' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt="Profile"
+                    className={`h-7 w-7 rounded-full ${
+                      location.pathname.includes('/profile') ? 'ring-2 ring-accent-purple' : ''
+                    }`}
+                  />
+                ) : (
+                  <div className={`h-7 w-7 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-xs font-bold ${
+                    location.pathname.includes('/profile') ? 'ring-2 ring-accent-purple' : ''
+                  }`}>
+                    {user?.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </Link>
+            </div>
           </div>
-        </div>
-      </footer>
+        </nav>
+      )}
     </div>
   );
 };
-
-interface NavLinkProps {
-  to: string;
-  active: boolean;
-  children: React.ReactNode;
-  mobile?: boolean;
-}
-
-const NavLink: React.FC<NavLinkProps> = ({ to, active, children, mobile }) => (
-  <Link
-    to={to}
-    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-      active
-        ? 'bg-accent-purple text-white'
-        : 'hover:bg-dark-card'
-    } ${mobile ? 'flex-1 text-center' : ''}`}
-  >
-    {children}
-  </Link>
-);

@@ -40,7 +40,7 @@ function App() {
       <Route
         path="/events/:id"
         element={
-          <Layout>
+          <Layout showBackButton title="Event Details">
             <EventDetail />
           </Layout>
         }
@@ -49,7 +49,7 @@ function App() {
         path="/recommendations"
         element={
           isAuthenticated ? (
-            <Layout>
+            <Layout title="For You">
               <Recommendations />
             </Layout>
           ) : (
@@ -60,7 +60,7 @@ function App() {
       <Route
         path="/profile/:id"
         element={
-          <Layout>
+          <Layout showBackButton title="Profile">
             <Profile />
           </Layout>
         }
@@ -69,7 +69,7 @@ function App() {
         path="/create-event"
         element={
           isAuthenticated ? (
-            <Layout>
+            <Layout showBackButton title="Create Event">
               <CreateEvent />
             </Layout>
           ) : (

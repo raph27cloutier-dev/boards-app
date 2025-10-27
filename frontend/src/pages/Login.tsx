@@ -16,18 +16,38 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('Attempting login with:', email);
       await login({ email, password });
+      console.log('Login successful!');
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+      console.error('Login error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to login. Please check your credentials.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const useDemoAccount = () => {
+    setEmail('raph@boards.app');
+    setPassword('boards2025');
+  };
+
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center px-4">
       <div className="max-w-md w-full">
+        {/* Back button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-colors flex items-center text-gray-400 hover:text-white"
+        >
+          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back
+        </button>
+
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-accent-purple to-accent-pink bg-clip-text text-transparent">
             BOARDS
@@ -37,6 +57,18 @@ export const Login: React.FC = () => {
 
         <div className="bg-dark-card border border-dark-border rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6">Login</h2>
+
+          {/* Demo Account Helper */}
+          <div className="mb-4 p-3 rounded-lg bg-accent-purple/10 border border-accent-purple/20">
+            <p className="text-sm text-accent-purple mb-2">Try the demo account:</p>
+            <button
+              type="button"
+              onClick={useDemoAccount}
+              className="text-xs text-accent-purple hover:underline"
+            >
+              Use: raph@boards.app / boards2025
+            </button>
+          </div>
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
