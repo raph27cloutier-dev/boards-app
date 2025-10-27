@@ -61,6 +61,17 @@ export const Signup: React.FC = () => {
   return (
     <div className="min-h-screen bg-dark-bg flex items-center justify-center px-4 py-8">
       <div className="max-w-2xl w-full">
+        {/* Back button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-colors flex items-center text-gray-400 hover:text-white"
+        >
+          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back
+        </button>
+
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-accent-purple to-accent-pink bg-clip-text text-transparent">
             BOARDS
