@@ -10,6 +10,7 @@ import {
   Profile,
   CreateEvent,
 } from './pages';
+import ToastContainer from './components/Toast';
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -23,10 +24,12 @@ function App() {
   }
 
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+    <>
+      <ToastContainer />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
       {/* Protected routes with layout */}
       <Route
@@ -80,7 +83,8 @@ function App() {
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

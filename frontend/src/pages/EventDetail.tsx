@@ -3,11 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
 
 export const EventDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<'going' | 'interested' | 'maybe'>('going');
@@ -27,9 +29,13 @@ export const EventDetail: React.FC = () => {
   const rsvpMutation = useMutation({
     mutationFn: (status: 'going' | 'interested' | 'maybe') =>
       eventsAPI.rsvp(id!, status),
-    onSuccess: () => {
+    onSuccess: (_, status) => {
       queryClient.invalidateQueries({ queryKey: ['event', id] });
       queryClient.invalidateQueries({ queryKey: ['attendees', id] });
+      showToast(`You're ${status === 'going' ? 'going' : status} to this event!`, 'success');
+    },
+    onError: () => {
+      showToast('Failed to RSVP. Please try again.', 'error');
     },
   });
 
@@ -38,6 +44,10 @@ export const EventDetail: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event', id] });
       queryClient.invalidateQueries({ queryKey: ['attendees', id] });
+      showToast('RSVP cancelled successfully', 'success');
+    },
+    onError: () => {
+      showToast('Failed to cancel RSVP. Please try again.', 'error');
     },
   });
 
@@ -224,7 +234,7 @@ export const EventDetail: React.FC = () => {
                 <button
                   onClick={handleCancelRsvp}
                   disabled={cancelRsvpMutation.isPending}
-                  className="w-full py-2 px-4 rounded-lg border border-dark-border hover:bg-dark-card disabled:opacity-50 transition-colors"
+                  className="w-full py-2 px-4 rounded-lg border border-dark-border hover:bg-dark-card disabled:opacity-50 transition-colors btn-press"
                 >
                   {cancelRsvpMutation.isPending ? 'Canceling...' : 'Cancel RSVP'}
                 </button>
@@ -236,9 +246,9 @@ export const EventDetail: React.FC = () => {
                     <button
                       key={status}
                       onClick={() => setSelectedStatus(status)}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-300 btn-press ${
                         selectedStatus === status
-                          ? 'bg-accent-purple text-white'
+                          ? 'bg-accent-purple text-white shadow-lg shadow-accent-purple/20'
                           : 'bg-dark-card border border-dark-border hover:border-accent-purple'
                       }`}
                     >
@@ -249,7 +259,7 @@ export const EventDetail: React.FC = () => {
                 <button
                   onClick={handleRsvp}
                   disabled={rsvpMutation.isPending}
-                  className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 font-medium transition-colors"
+                  className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 font-medium transition-all duration-300 btn-press hover:shadow-lg hover:shadow-accent-purple/50"
                 >
                   {rsvpMutation.isPending ? 'RSVPing...' : 'RSVP to Event'}
                 </button>

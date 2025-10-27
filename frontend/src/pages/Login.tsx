@@ -40,7 +40,7 @@ export const Login: React.FC = () => {
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-colors flex items-center text-gray-400 hover:text-white"
+          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-all duration-300 flex items-center text-gray-400 hover:text-white btn-press"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -59,12 +59,12 @@ export const Login: React.FC = () => {
           <h2 className="text-2xl font-bold mb-6">Login</h2>
 
           {/* Demo Account Helper */}
-          <div className="mb-4 p-3 rounded-lg bg-accent-purple/10 border border-accent-purple/20">
+          <div className="mb-4 p-3 rounded-lg bg-accent-purple/10 border border-accent-purple/20 animate-fade-in">
             <p className="text-sm text-accent-purple mb-2">Try the demo account:</p>
             <button
               type="button"
               onClick={useDemoAccount}
-              className="text-xs text-accent-purple hover:underline"
+              className="text-xs text-accent-purple hover:underline btn-press"
             >
               Use: raph@boards.app / boards2025
             </button>
@@ -110,7 +110,7 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+              className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-300 btn-press hover:shadow-lg hover:shadow-accent-purple/50"
             >
               {isLoading ? 'Logging in...' : 'Login'}
             </button>

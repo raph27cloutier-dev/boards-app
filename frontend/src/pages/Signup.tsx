@@ -64,7 +64,7 @@ export const Signup: React.FC = () => {
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-colors flex items-center text-gray-400 hover:text-white"
+          className="mb-4 p-2 hover:bg-dark-card rounded-lg transition-all duration-300 flex items-center text-gray-400 hover:text-white btn-press"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -185,10 +185,10 @@ export const Signup: React.FC = () => {
                     key={vibe}
                     type="button"
                     onClick={() => toggleVibe(vibe)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    className={`filter-button ${
                       selectedVibes.includes(vibe)
-                        ? 'bg-accent-purple text-white'
-                        : 'bg-dark-bg border border-dark-border hover:border-accent-purple'
+                        ? 'filter-button-active'
+                        : 'filter-button-inactive bg-dark-bg'
                     }`}
                   >
                     {vibe}
@@ -200,7 +200,7 @@ export const Signup: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+              className="w-full py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-300 btn-press hover:shadow-lg hover:shadow-accent-purple/50"
             >
               {isLoading ? 'Creating account...' : 'Sign Up'}
             </button>

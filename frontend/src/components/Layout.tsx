@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import BackToTop from './BackToTop';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -107,7 +108,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, showBackButton = false
               {/* Create Event (Center - larger) */}
               <Link
                 to="/create-event"
-                className="p-4 rounded-full bg-gradient-to-r from-accent-purple to-accent-pink text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
+                className="p-4 rounded-full bg-gradient-to-r from-accent-purple to-accent-pink text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all animate-pulse-subtle"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
@@ -150,6 +151,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, showBackButton = false
           </div>
         </nav>
       )}
+
+      {/* Back to Top Button */}
+      <BackToTop />
     </div>
   );
 };

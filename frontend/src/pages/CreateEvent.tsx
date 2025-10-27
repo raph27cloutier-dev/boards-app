@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { eventsAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { VIBES, NEIGHBORHOODS } from '../types';
 
 export const CreateEvent: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -36,10 +38,13 @@ export const CreateEvent: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (formDataToSend: FormData) => eventsAPI.create(formDataToSend),
     onSuccess: (event) => {
+      showToast('Event created successfully!', 'success');
       navigate(`/events/${event.id}`);
     },
     onError: (err: any) => {
-      setError(err.response?.data?.message || 'Failed to create event');
+      const errorMessage = err.response?.data?.message || 'Failed to create event';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     },
   });
 
@@ -201,10 +206,10 @@ export const CreateEvent: React.FC = () => {
                 key={vibe}
                 type="button"
                 onClick={() => toggleVibe(vibe)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`filter-button ${
                   selectedVibes.includes(vibe)
-                    ? 'bg-accent-purple text-white'
-                    : 'bg-dark-card border border-dark-border hover:border-accent-purple'
+                    ? 'filter-button-active'
+                    : 'filter-button-inactive'
                 }`}
               >
                 {vibe}
@@ -377,14 +382,14 @@ export const CreateEvent: React.FC = () => {
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="flex-1 py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            className="flex-1 py-3 px-4 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all duration-300 btn-press hover:shadow-lg hover:shadow-accent-purple/50"
           >
             {createMutation.isPending ? 'Creating Event...' : 'Create Event'}
           </button>
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-6 py-3 rounded-lg border border-dark-border hover:bg-dark-card transition-colors"
+            className="px-6 py-3 rounded-lg border border-dark-border hover:bg-dark-card transition-all duration-300 btn-press"
           >
             Cancel
           </button>
