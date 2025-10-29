@@ -115,6 +115,15 @@ export const usersAPI = {
     const response = await api.get<Event[]>(`/api/users/${id}/events`);
     return response.data;
   },
+
+  updateProfile: async (formData: FormData): Promise<User> => {
+    const response = await api.put<User>('/api/users/me', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 // Recommendations API

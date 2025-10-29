@@ -12,6 +12,17 @@ import {
 } from './pages';
 import ToastContainer from './components/Toast';
 
+// Profile redirect component
+function ProfileRedirect() {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={`/profile/${user.id}`} replace />;
+}
+
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -59,6 +70,10 @@ function App() {
             <Navigate to="/login" replace />
           )
         }
+      />
+      <Route
+        path="/profile"
+        element={<ProfileRedirect />}
       />
       <Route
         path="/profile/:id"
