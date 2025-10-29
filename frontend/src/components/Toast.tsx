@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useToast, Toast as ToastType } from '../contexts/ToastContext';
+import { useToast } from '../contexts/ToastContext';
+import type { Toast as ToastType } from '../contexts/ToastContext';
 
 const Toast = ({ toast }: { toast: ToastType }) => {
   const { removeToast } = useToast();
