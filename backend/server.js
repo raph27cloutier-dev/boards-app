@@ -743,6 +743,104 @@ app.get(
   })
 );
 
+// Update user profile
+app.put(
+  '/api/users/me',
+  authenticate,
+  upload.single('avatar'),
+  asyncHandler(async (req, res) => {
+    const userId = req.userId;
+    const { displayName, bio, homeNeighborhood, vibePrefs } = req.body;
+
+    // Build update data
+    const updateData = {};
+    if (displayName !== undefined) updateData.displayName = displayName;
+    if (bio !== undefined) updateData.bio = bio;
+    if (homeNeighborhood !== undefined) updateData.homeNeighborhood = homeNeighborhood;
+
+    // Parse vibePrefs if it's a string (from multipart form)
+    if (vibePrefs !== undefined) {
+      updateData.vibePrefs = typeof vibePrefs === 'string'
+        ? vibePrefs.split(',').map(v => v.trim()).filter(Boolean)
+        : vibePrefs;
+    }
+
+    // Handle avatar upload
+    if (req.file) {
+      if (!cloudinary.config().cloud_name) {
+        return res.status(500).json({ error: 'Image upload not configured' });
+      }
+
+      try {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'boards-app/avatars',
+            transformation: [
+              { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+              { quality: 'auto', fetch_format: 'auto' }
+            ]
+          },
+          async (error, result) => {
+            if (error) {
+              console.error('Cloudinary upload error:', error);
+              return res.status(500).json({ error: 'Failed to upload avatar' });
+            }
+
+            updateData.avatarUrl = result.secure_url;
+
+            // Update user in database
+            const user = await prisma.user.update({
+              where: { id: userId },
+              data: updateData,
+              select: {
+                id: true,
+                username: true,
+                email: true,
+                displayName: true,
+                bio: true,
+                avatarUrl: true,
+                vibePrefs: true,
+                homeNeighborhood: true,
+                trustScore: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            });
+
+            res.json(user);
+          }
+        );
+
+        uploadStream.end(req.file.buffer);
+      } catch (error) {
+        console.error('Avatar upload error:', error);
+        return res.status(500).json({ error: 'Failed to upload avatar' });
+      }
+    } else {
+      // No avatar upload, just update other fields
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          displayName: true,
+          bio: true,
+          avatarUrl: true,
+          vibePrefs: true,
+          homeNeighborhood: true,
+          trustScore: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      res.json(user);
+    }
+  })
+);
+
 app.get(
   '/api/users/:id/events',
   asyncHandler(async (req, res) => {

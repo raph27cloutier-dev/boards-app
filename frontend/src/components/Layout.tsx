@@ -46,8 +46,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, showBackButton = false
               {title && <h1 className="text-lg font-semibold">{title}</h1>}
             </div>
 
-            {/* Right: User menu */}
-            {isAuthenticated && (
+            {/* Right: User menu or Login button */}
+            {isAuthenticated ? (
               <div className="flex items-center space-x-2">
                 <Link
                   to={`/profile/${user?.id}`}
@@ -64,6 +64,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, showBackButton = false
                       {user?.username.charAt(0).toUpperCase()}
                     </div>
                   )}
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/login"
+                  className="px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/90 font-medium transition-all duration-300"
+                >
+                  Login
                 </Link>
               </div>
             )}

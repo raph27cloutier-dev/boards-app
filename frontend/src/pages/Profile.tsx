@@ -1,18 +1,43 @@
-import React from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
+import { VIBES, NEIGHBORHOODS } from '../types';
 
 export const Profile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout, updateUser } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    bio: '',
+    homeNeighborhood: '',
+  });
+  const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user', id],
     queryFn: () => usersAPI.getById(id!),
     enabled: !!id,
+    onSuccess: (data) => {
+      // Initialize form data when user data loads
+      if (data && currentUser?.id === id) {
+        setFormData({
+          displayName: data.displayName || '',
+          bio: data.bio || '',
+          homeNeighborhood: data.homeNeighborhood || '',
+        });
+        setSelectedVibes(data.vibePrefs || []);
+      }
+    },
   });
 
   const { data: events, isLoading: eventsLoading } = useQuery({
@@ -22,6 +47,87 @@ export const Profile: React.FC = () => {
   });
 
   const isOwnProfile = currentUser?.id === id;
+
+  const updateMutation = useMutation({
+    mutationFn: (formDataToSend: FormData) => usersAPI.updateProfile(formDataToSend),
+    onSuccess: (updatedUser) => {
+      showToast('Profile updated successfully!', 'success');
+      updateUser(updatedUser);
+      queryClient.invalidateQueries({ queryKey: ['user', id] });
+      setIsEditing(false);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    },
+    onError: (err: any) => {
+      const errorMessage = err.response?.data?.message || 'Failed to update profile';
+      showToast(errorMessage, 'error');
+    },
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleVibe = (vibe: string) => {
+    setSelectedVibes((prev) =>
+      prev.includes(vibe) ? prev.filter((v) => v !== vibe) : [...prev, vibe]
+    );
+  };
+
+  const handleEditToggle = () => {
+    if (isEditing) {
+      // Cancel edit - reset form
+      if (user) {
+        setFormData({
+          displayName: user.displayName || '',
+          bio: user.bio || '',
+          homeNeighborhood: user.homeNeighborhood || '',
+        });
+        setSelectedVibes(user.vibePrefs || []);
+      }
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formDataToSend = new FormData();
+    if (formData.displayName) formDataToSend.append('displayName', formData.displayName);
+    if (formData.bio) formDataToSend.append('bio', formData.bio);
+    if (formData.homeNeighborhood) formDataToSend.append('homeNeighborhood', formData.homeNeighborhood);
+
+    selectedVibes.forEach((vibe) => formDataToSend.append('vibePrefs', vibe));
+
+    if (avatarFile) {
+      formDataToSend.append('avatar', avatarFile);
+    }
+
+    updateMutation.mutate(formDataToSend);
+  };
+
+  const handleLogout = () => {
+    logout();
+    showToast('Logged out successfully', 'success');
+    navigate('/login');
+  };
 
   if (userLoading) {
     return (
@@ -43,67 +149,227 @@ export const Profile: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 px-4">
       {/* Profile Header */}
       <div className="bg-dark-card border border-dark-border rounded-lg p-8">
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Avatar */}
-          {user.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.displayName || user.username}
-              className="w-32 h-32 rounded-full border-4 border-accent-purple"
-            />
-          ) : (
-            <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-5xl font-bold">
-              {user.username.charAt(0).toUpperCase()}
-            </div>
-          )}
-
-          {/* User Info */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <h1 className="text-3xl font-bold">{user.displayName || user.username}</h1>
-              <p className="text-gray-400">@{user.username}</p>
-            </div>
-
-            {user.bio && <p className="text-gray-300">{user.bio}</p>}
-
-            <div className="flex flex-wrap gap-4 text-sm">
-              {user.homeNeighborhood && (
-                <div className="flex items-center space-x-2">
-                  <span>📍</span>
-                  <span>{user.homeNeighborhood}</span>
+        {!isEditing ? (
+          /* View Mode */
+          <>
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+              {/* Avatar */}
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.displayName || user.username}
+                  className="w-32 h-32 rounded-full border-4 border-accent-purple"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-5xl font-bold">
+                  {user.username.charAt(0).toUpperCase()}
                 </div>
               )}
-              <div className="flex items-center space-x-2">
-                <span>⭐</span>
-                <span>Trust Score: {user.trustScore.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span>📅</span>
-                <span>Joined {format(new Date(user.createdAt), 'MMM yyyy')}</span>
+
+              {/* User Info */}
+              <div className="flex-1 space-y-4">
+                <div>
+                  <h1 className="text-3xl font-bold">{user.displayName || user.username}</h1>
+                  <p className="text-gray-400">@{user.username}</p>
+                </div>
+
+                {user.bio && <p className="text-gray-300">{user.bio}</p>}
+
+                <div className="flex flex-wrap gap-4 text-sm">
+                  {user.homeNeighborhood && (
+                    <div className="flex items-center space-x-2">
+                      <span>📍</span>
+                      <span>{user.homeNeighborhood}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <span>⭐</span>
+                    <span>Trust Score: {user.trustScore.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span>📅</span>
+                    <span>Joined {format(new Date(user.createdAt), 'MMM yyyy')}</span>
+                  </div>
+                </div>
+
+                {/* Vibes */}
+                {user.vibePrefs && user.vibePrefs.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-400 mb-2">Vibes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {user.vibePrefs.map((vibe) => (
+                        <span
+                          key={vibe}
+                          className="px-3 py-1 rounded-full text-sm font-medium bg-accent-purple/20 text-accent-purple"
+                        >
+                          {vibe}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Vibes */}
-            {user.vibePrefs && user.vibePrefs.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-gray-400 mb-2">Vibes</p>
-                <div className="flex flex-wrap gap-2">
-                  {user.vibePrefs.map((vibe) => (
-                    <span
-                      key={vibe}
-                      className="px-3 py-1 rounded-full text-sm font-medium bg-accent-purple/20 text-accent-purple"
-                    >
-                      {vibe}
-                    </span>
-                  ))}
-                </div>
+            {/* Action Buttons */}
+            {isOwnProfile && (
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleEditToggle}
+                  className="px-6 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/90 transition-colors font-medium"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-6 py-2 rounded-lg border border-dark-border hover:bg-dark-bg transition-colors font-medium"
+                >
+                  Logout
+                </button>
               </div>
             )}
-          </div>
-        </div>
+          </>
+        ) : (
+          /* Edit Mode */
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center gap-3">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt="Preview"
+                    className="w-32 h-32 rounded-full border-4 border-accent-purple object-cover"
+                  />
+                ) : user.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.displayName || user.username}
+                    className="w-32 h-32 rounded-full border-4 border-accent-purple object-cover"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-5xl font-bold">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                  id="avatar-upload"
+                />
+                <label
+                  htmlFor="avatar-upload"
+                  className="px-4 py-2 rounded-lg bg-dark-bg border border-dark-border hover:border-accent-purple cursor-pointer transition-colors text-sm"
+                >
+                  Change Avatar
+                </label>
+              </div>
+
+              {/* Edit Form */}
+              <div className="flex-1 space-y-4 w-full">
+                {/* Display Name */}
+                <div>
+                  <label htmlFor="displayName" className="block text-sm font-medium mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    id="displayName"
+                    name="displayName"
+                    type="text"
+                    value={formData.displayName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 rounded-lg bg-dark-bg border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20"
+                    placeholder={user.username}
+                  />
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <label htmlFor="bio" className="block text-sm font-medium mb-2">
+                    Bio
+                  </label>
+                  <textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    rows={3}
+                    className="w-full px-4 py-2 rounded-lg bg-dark-bg border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20"
+                    placeholder="Tell us about yourself..."
+                  />
+                </div>
+
+                {/* Home Neighborhood */}
+                <div>
+                  <label htmlFor="homeNeighborhood" className="block text-sm font-medium mb-2">
+                    Home Neighborhood
+                  </label>
+                  <select
+                    id="homeNeighborhood"
+                    name="homeNeighborhood"
+                    value={formData.homeNeighborhood}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 rounded-lg bg-dark-bg border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20"
+                  >
+                    <option value="">Select neighborhood</option>
+                    {NEIGHBORHOODS.map((neighborhood) => (
+                      <option key={neighborhood} value={neighborhood}>
+                        {neighborhood}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Vibes */}
+                <div>
+                  <label className="block text-sm font-medium mb-3">
+                    Vibes (Select all that apply)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {VIBES.map((vibe) => (
+                      <button
+                        key={vibe}
+                        type="button"
+                        onClick={() => toggleVibe(vibe)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                          selectedVibes.includes(vibe)
+                            ? 'bg-accent-purple text-white'
+                            : 'bg-dark-bg border border-dark-border hover:border-accent-purple'
+                        }`}
+                      >
+                        {vibe}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3 pt-4 border-t border-dark-border">
+              <button
+                type="submit"
+                disabled={updateMutation.isPending}
+                className="px-6 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-all"
+              >
+                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                onClick={handleEditToggle}
+                disabled={updateMutation.isPending}
+                className="px-6 py-2 rounded-lg border border-dark-border hover:bg-dark-bg transition-colors font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Hosted Events */}
