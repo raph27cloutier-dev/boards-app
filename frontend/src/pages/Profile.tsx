@@ -27,18 +27,19 @@ export const Profile: React.FC = () => {
     queryKey: ['user', id],
     queryFn: () => usersAPI.getById(id!),
     enabled: !!id,
-    onSuccess: (data) => {
-      // Initialize form data when user data loads
-      if (data && currentUser?.id === id) {
-        setFormData({
-          displayName: data.displayName || '',
-          bio: data.bio || '',
-          homeNeighborhood: data.homeNeighborhood || '',
-        });
-        setSelectedVibes(data.vibePrefs || []);
-      }
-    },
   });
+
+  // Initialize form data when user data loads
+  React.useEffect(() => {
+    if (user && currentUser?.id === id) {
+      setFormData({
+        displayName: user.displayName || '',
+        bio: user.bio || '',
+        homeNeighborhood: user.homeNeighborhood || '',
+      });
+      setSelectedVibes(user.vibePrefs || []);
+    }
+  }, [user, currentUser?.id, id]);
 
   const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ['userEvents', id],
@@ -90,16 +91,14 @@ export const Profile: React.FC = () => {
   };
 
   const handleEditToggle = () => {
-    if (isEditing) {
+    if (isEditing && user) {
       // Cancel edit - reset form
-      if (user) {
-        setFormData({
-          displayName: user.displayName || '',
-          bio: user.bio || '',
-          homeNeighborhood: user.homeNeighborhood || '',
-        });
-        setSelectedVibes(user.vibePrefs || []);
-      }
+      setFormData({
+        displayName: user.displayName || '',
+        bio: user.bio || '',
+        homeNeighborhood: user.homeNeighborhood || '',
+      });
+      setSelectedVibes(user.vibePrefs || []);
       setAvatarFile(null);
       setAvatarPreview(null);
     }
@@ -148,6 +147,9 @@ export const Profile: React.FC = () => {
     );
   }
 
+  // At this point, TypeScript knows user is defined
+  const profile = user;
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 px-4">
       {/* Profile Header */}
@@ -157,50 +159,50 @@ export const Profile: React.FC = () => {
           <>
             <div className="flex flex-col md:flex-row gap-6 items-start">
               {/* Avatar */}
-              {user.avatarUrl ? (
+              {profile.avatarUrl ? (
                 <img
-                  src={user.avatarUrl}
-                  alt={user.displayName || user.username}
+                  src={profile.avatarUrl}
+                  alt={profile.displayName || profile.username}
                   className="w-32 h-32 rounded-full border-4 border-accent-purple"
                 />
               ) : (
                 <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-5xl font-bold">
-                  {user.username.charAt(0).toUpperCase()}
+                  {profile.username.charAt(0).toUpperCase()}
                 </div>
               )}
 
               {/* User Info */}
               <div className="flex-1 space-y-4">
                 <div>
-                  <h1 className="text-3xl font-bold">{user.displayName || user.username}</h1>
-                  <p className="text-gray-400">@{user.username}</p>
+                  <h1 className="text-3xl font-bold">{profile.displayName || profile.username}</h1>
+                  <p className="text-gray-400">@{profile.username}</p>
                 </div>
 
-                {user.bio && <p className="text-gray-300">{user.bio}</p>}
+                {profile.bio && <p className="text-gray-300">{profile.bio}</p>}
 
                 <div className="flex flex-wrap gap-4 text-sm">
-                  {user.homeNeighborhood && (
+                  {profile.homeNeighborhood && (
                     <div className="flex items-center space-x-2">
                       <span>📍</span>
-                      <span>{user.homeNeighborhood}</span>
+                      <span>{profile.homeNeighborhood}</span>
                     </div>
                   )}
                   <div className="flex items-center space-x-2">
                     <span>⭐</span>
-                    <span>Trust Score: {user.trustScore.toFixed(2)}</span>
+                    <span>Trust Score: {profile.trustScore.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span>📅</span>
-                    <span>Joined {format(new Date(user.createdAt), 'MMM yyyy')}</span>
+                    <span>Joined {format(new Date(profile.createdAt), 'MMM yyyy')}</span>
                   </div>
                 </div>
 
                 {/* Vibes */}
-                {user.vibePrefs && user.vibePrefs.length > 0 && (
+                {profile.vibePrefs && profile.vibePrefs.length > 0 && (
                   <div>
                     <p className="text-sm font-medium text-gray-400 mb-2">Vibes</p>
                     <div className="flex flex-wrap gap-2">
-                      {user.vibePrefs.map((vibe) => (
+                      {profile.vibePrefs.map((vibe) => (
                         <span
                           key={vibe}
                           className="px-3 py-1 rounded-full text-sm font-medium bg-accent-purple/20 text-accent-purple"
@@ -244,15 +246,15 @@ export const Profile: React.FC = () => {
                     alt="Preview"
                     className="w-32 h-32 rounded-full border-4 border-accent-purple object-cover"
                   />
-                ) : user.avatarUrl ? (
+                ) : profile.avatarUrl ? (
                   <img
-                    src={user.avatarUrl}
-                    alt={user.displayName || user.username}
+                    src={profile.avatarUrl}
+                    alt={profile.displayName || profile.username}
                     className="w-32 h-32 rounded-full border-4 border-accent-purple object-cover"
                   />
                 ) : (
                   <div className="w-32 h-32 rounded-full bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center text-5xl font-bold">
-                    {user.username.charAt(0).toUpperCase()}
+                    {profile.username.charAt(0).toUpperCase()}
                   </div>
                 )}
                 <input
@@ -284,7 +286,7 @@ export const Profile: React.FC = () => {
                     value={formData.displayName}
                     onChange={handleChange}
                     className="w-full px-4 py-2 rounded-lg bg-dark-bg border border-dark-border focus:border-accent-purple focus:outline-none focus:ring-2 focus:ring-accent-purple/20"
-                    placeholder={user.username}
+                    placeholder={profile.username}
                   />
                 </div>
 
