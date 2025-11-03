@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
-import { VIBES, NEIGHBORHOODS } from '../types';
+import { VIBES, NEIGHBORHOODS, type User, type Event } from '../types';
 
 export const Profile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,28 +23,29 @@ export const Profile: React.FC = () => {
   });
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
 
-  const { data: user, isLoading: userLoading } = useQuery({
+  const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ['user', id],
     queryFn: () => usersAPI.getById(id!),
     enabled: !!id,
-    onSuccess: (data) => {
-      // Initialize form data when user data loads
-      if (data && currentUser?.id === id) {
-        setFormData({
-          displayName: data.displayName || '',
-          bio: data.bio || '',
-          homeNeighborhood: data.homeNeighborhood || '',
-        });
-        setSelectedVibes(data.vibePrefs || []);
-      }
-    },
   });
 
-  const { data: events, isLoading: eventsLoading } = useQuery({
+  const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['userEvents', id],
     queryFn: () => usersAPI.getEvents(id!),
     enabled: !!id,
   });
+
+  // Initialize form data when user data loads
+  useEffect(() => {
+    if (user && currentUser?.id === id) {
+      setFormData({
+        displayName: user.displayName || '',
+        bio: user.bio || '',
+        homeNeighborhood: user.homeNeighborhood || '',
+      });
+      setSelectedVibes(user.vibePrefs || []);
+    }
+  }, [user, currentUser?.id, id]);
 
   const isOwnProfile = currentUser?.id === id;
 
@@ -200,7 +201,7 @@ export const Profile: React.FC = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-400 mb-2">Vibes</p>
                     <div className="flex flex-wrap gap-2">
-                      {user.vibePrefs.map((vibe) => (
+                      {user.vibePrefs.map((vibe: string) => (
                         <span
                           key={vibe}
                           className="px-3 py-1 rounded-full text-sm font-medium bg-accent-purple/20 text-accent-purple"
