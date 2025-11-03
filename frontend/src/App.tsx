@@ -10,6 +10,7 @@ import {
   Profile,
   CreateEvent,
 } from './pages';
+import { Analytics } from './pages/Analytics';
 import ToastContainer from './components/Toast';
 
 // Profile redirect component
@@ -89,6 +90,18 @@ function App() {
           isAuthenticated ? (
             <Layout showBackButton title="Create Event">
               <CreateEvent />
+            </Layout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          isAuthenticated ? (
+            <Layout title="Analytics">
+              <Analytics />
             </Layout>
           ) : (
             <Navigate to="/login" replace />

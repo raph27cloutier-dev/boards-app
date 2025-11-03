@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
 import { VIBES, NEIGHBORHOODS, type User, type Event } from '../types';
+import { FollowButton } from '../components/FollowButton';
 
 export const Profile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,12 @@ export const Profile: React.FC = () => {
   const { data: events, isLoading: eventsLoading } = useQuery<Event[]>({
     queryKey: ['userEvents', id],
     queryFn: () => usersAPI.getEvents(id!),
+    enabled: !!id,
+  });
+
+  const { data: followStats } = useQuery<{ followerCount: number; followingCount: number }>({
+    queryKey: ['follow-stats', id],
+    queryFn: () => usersAPI.getFollowStats(id!),
     enabled: !!id,
   });
 
@@ -179,6 +186,20 @@ export const Profile: React.FC = () => {
 
                 {user.bio && <p className="text-gray-300">{user.bio}</p>}
 
+                {/* Follow Stats */}
+                {followStats && (
+                  <div className="flex gap-6 text-sm">
+                    <div>
+                      <span className="font-bold text-lg">{followStats.followerCount}</span>
+                      <span className="text-gray-400 ml-1">Followers</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-lg">{followStats.followingCount}</span>
+                      <span className="text-gray-400 ml-1">Following</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-4 text-sm">
                   {user.homeNeighborhood && (
                     <div className="flex items-center space-x-2">
@@ -216,22 +237,26 @@ export const Profile: React.FC = () => {
             </div>
 
             {/* Action Buttons */}
-            {isOwnProfile && (
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={handleEditToggle}
-                  className="px-6 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/90 transition-colors font-medium"
-                >
-                  Edit Profile
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="px-6 py-2 rounded-lg border border-dark-border hover:bg-dark-bg transition-colors font-medium"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
+            <div className="mt-6 flex gap-3">
+              {isOwnProfile ? (
+                <>
+                  <button
+                    onClick={handleEditToggle}
+                    className="px-6 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple/90 transition-colors font-medium"
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-6 py-2 rounded-lg border border-dark-border hover:bg-dark-bg transition-colors font-medium"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <FollowButton userId={id!} />
+              )}
+            </div>
           </>
         ) : (
           /* Edit Mode */
