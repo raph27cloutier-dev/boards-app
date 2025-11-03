@@ -856,6 +856,270 @@ app.get(
   })
 );
 
+// Follow a user
+app.post(
+  '/api/users/:id/follow',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const followingId = req.params.id;
+    const followerId = req.user.id;
+
+    if (followerId === followingId) {
+      return res.status(400).json({ error: 'Cannot follow yourself' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: followingId } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: { followerId, followingId },
+      },
+    });
+
+    if (existingFollow) {
+      return res.status(400).json({ error: 'Already following this user' });
+    }
+
+    const follow = await prisma.follow.create({
+      data: { followerId, followingId },
+    });
+
+    res.json({ success: true, follow });
+  })
+);
+
+// Unfollow a user
+app.delete(
+  '/api/users/:id/follow',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const followingId = req.params.id;
+    const followerId = req.user.id;
+
+    await prisma.follow.delete({
+      where: {
+        followerId_followingId: { followerId, followingId },
+      },
+    });
+
+    res.json({ success: true });
+  })
+);
+
+// Get followers of a user
+app.get(
+  '/api/users/:id/followers',
+  asyncHandler(async (req, res) => {
+    const followers = await prisma.follow.findMany({
+      where: { followingId: req.params.id },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(followers.map((f) => f.follower));
+  })
+);
+
+// Get users that a user is following
+app.get(
+  '/api/users/:id/following',
+  asyncHandler(async (req, res) => {
+    const following = await prisma.follow.findMany({
+      where: { followerId: req.params.id },
+      include: {
+        following: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json(following.map((f) => f.following));
+  })
+);
+
+// Get follower/following counts
+app.get(
+  '/api/users/:id/follow-stats',
+  asyncHandler(async (req, res) => {
+    const [followerCount, followingCount] = await Promise.all([
+      prisma.follow.count({ where: { followingId: req.params.id } }),
+      prisma.follow.count({ where: { followerId: req.params.id } }),
+    ]);
+
+    res.json({ followerCount, followingCount });
+  })
+);
+
+// Check if current user follows another user
+app.get(
+  '/api/users/:id/is-following',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const follow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: req.user.id,
+          followingId: req.params.id,
+        },
+      },
+    });
+
+    res.json({ isFollowing: !!follow });
+  })
+);
+
+// Get analytics for a specific event (host only)
+app.get(
+  '/api/events/:id/analytics',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const event = await prisma.event.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    if (event.hostId !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to view analytics' });
+    }
+
+    // Get RSVP stats
+    const rsvps = await prisma.rSVP.findMany({
+      where: { eventId: req.params.id },
+      include: {
+        user: {
+          select: {
+            username: true,
+            vibePrefs: true,
+            homeNeighborhood: true,
+          },
+        },
+      },
+    });
+
+    const rsvpsByStatus = {
+      going: rsvps.filter((r) => r.status === 'going').length,
+      interested: rsvps.filter((r) => r.status === 'interested').length,
+      maybe: rsvps.filter((r) => r.status === 'maybe').length,
+    };
+
+    // Get interaction stats
+    const interactions = await prisma.interaction.findMany({
+      where: { eventId: req.params.id },
+    });
+
+    const interactionsByAction = {
+      view: interactions.filter((i) => i.action === 'view').length,
+      cosign: interactions.filter((i) => i.action === 'cosign').length,
+      going: interactions.filter((i) => i.action === 'going').length,
+      hide: interactions.filter((i) => i.action === 'hide').length,
+    };
+
+    // Get attendee demographics
+    const vibeBreakdown = {};
+    const neighborhoodBreakdown = {};
+
+    rsvps.forEach((rsvp) => {
+      if (rsvp.user.vibePrefs) {
+        rsvp.user.vibePrefs.forEach((vibe) => {
+          vibeBreakdown[vibe] = (vibeBreakdown[vibe] || 0) + 1;
+        });
+      }
+      if (rsvp.user.homeNeighborhood) {
+        neighborhoodBreakdown[rsvp.user.homeNeighborhood] =
+          (neighborhoodBreakdown[rsvp.user.homeNeighborhood] || 0) + 1;
+      }
+    });
+
+    res.json({
+      eventId: req.params.id,
+      totalRsvps: rsvps.length,
+      rsvpsByStatus,
+      totalInteractions: interactions.length,
+      interactionsByAction,
+      attendeeDemographics: {
+        vibeBreakdown,
+        neighborhoodBreakdown,
+      },
+    });
+  })
+);
+
+// Get host dashboard analytics
+app.get(
+  '/api/analytics/host-dashboard',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const hostId = req.user.id;
+
+    // Get all host events
+    const events = await prisma.event.findMany({
+      where: { hostId },
+      include: {
+        _count: { select: { rsvps: true, interactions: true } },
+      },
+      orderBy: { startTime: 'desc' },
+    });
+
+    // Calculate total stats
+    const totalEvents = events.length;
+    const totalRsvps = events.reduce((sum, e) => sum + e._count.rsvps, 0);
+    const totalInteractions = events.reduce((sum, e) => sum + e._count.interactions, 0);
+
+    // Find most popular event
+    const mostPopularEvent = events.length > 0
+      ? events.reduce((max, e) => (e._count.rsvps > max._count.rsvps ? e : max))
+      : null;
+
+    // Get recent events with stats
+    const recentEvents = events.slice(0, 5).map((e) => ({
+      id: e.id,
+      title: e.title,
+      startTime: e.startTime,
+      rsvpCount: e._count.rsvps,
+      interactionCount: e._count.interactions,
+      popularityScore: e.popularityScore,
+    }));
+
+    res.json({
+      totalEvents,
+      totalRsvps,
+      totalInteractions,
+      averageRsvpsPerEvent: totalEvents > 0 ? (totalRsvps / totalEvents).toFixed(1) : 0,
+      mostPopularEvent: mostPopularEvent
+        ? {
+            id: mostPopularEvent.id,
+            title: mostPopularEvent.title,
+            rsvpCount: mostPopularEvent._count.rsvps,
+          }
+        : null,
+      recentEvents,
+    });
+  })
+);
+
 // Recommendation feed
 app.post(
   '/api/reco/feed',

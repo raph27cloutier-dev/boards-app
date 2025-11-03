@@ -124,6 +124,21 @@ export const usersAPI = {
     });
     return response.data;
   },
+
+  getFollowStats: async (id: string): Promise<{ followerCount: number; followingCount: number }> => {
+    const response = await api.get(`/api/users/${id}/follow-stats`);
+    return response.data;
+  },
+
+  getFollowers: async (id: string): Promise<User[]> => {
+    const response = await api.get<User[]>(`/api/users/${id}/followers`);
+    return response.data;
+  },
+
+  getFollowing: async (id: string): Promise<User[]> => {
+    const response = await api.get<User[]>(`/api/users/${id}/following`);
+    return response.data;
+  },
 };
 
 // Recommendations API
