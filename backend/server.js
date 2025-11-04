@@ -308,7 +308,7 @@ app.post(
     const { email, username, password, displayName, vibePrefs = [], homeNeighborhood } = req.body;
 
     if (!email || !username || !password || !displayName) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
     const existing = await prisma.user.findFirst({
@@ -316,7 +316,7 @@ app.post(
     });
 
     if (existing) {
-      return res.status(400).json({ error: 'Email or username already exists' });
+      return res.status(400).json({ message: 'Email or username already exists' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -342,6 +342,13 @@ app.post(
         email: user.email,
         username: user.username,
         displayName: user.displayName,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        vibePrefs: user.vibePrefs,
+        homeNeighborhood: user.homeNeighborhood,
+        trustScore: user.trustScore,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
       },
       token,
     });
@@ -356,12 +363,12 @@ app.post(
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
@@ -374,6 +381,13 @@ app.post(
         email: user.email,
         username: user.username,
         displayName: user.displayName,
+        bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        vibePrefs: user.vibePrefs,
+        homeNeighborhood: user.homeNeighborhood,
+        trustScore: user.trustScore,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
       },
       token,
     });
@@ -394,6 +408,9 @@ app.get(
       avatarUrl: req.user.avatarUrl,
       vibePrefs: req.user.vibePrefs,
       homeNeighborhood: req.user.homeNeighborhood,
+      trustScore: req.user.trustScore,
+      createdAt: req.user.createdAt.toISOString(),
+      updatedAt: req.user.updatedAt.toISOString(),
     });
   })
 );
