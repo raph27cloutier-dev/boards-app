@@ -859,7 +859,7 @@ app.get(
 // Follow a user
 app.post(
   '/api/users/:id/follow',
-  requireAuth,
+  authenticate,
   asyncHandler(async (req, res) => {
     const followingId = req.params.id;
     const followerId = req.user.id;
@@ -894,7 +894,7 @@ app.post(
 // Unfollow a user
 app.delete(
   '/api/users/:id/follow',
-  requireAuth,
+  authenticate,
   asyncHandler(async (req, res) => {
     const followingId = req.params.id;
     const followerId = req.user.id;
@@ -973,7 +973,7 @@ app.get(
 // Check if current user follows another user
 app.get(
   '/api/users/:id/is-following',
-  requireAuth,
+  authenticate,
   asyncHandler(async (req, res) => {
     const follow = await prisma.follow.findUnique({
       where: {
@@ -991,7 +991,7 @@ app.get(
 // Get analytics for a specific event (host only)
 app.get(
   '/api/events/:id/analytics',
-  requireAuth,
+  authenticate,
   asyncHandler(async (req, res) => {
     const event = await prisma.event.findUnique({
       where: { id: req.params.id },
@@ -1070,7 +1070,7 @@ app.get(
 // Get host dashboard analytics
 app.get(
   '/api/analytics/host-dashboard',
-  requireAuth,
+  authenticate,
   asyncHandler(async (req, res) => {
     const hostId = req.user.id;
 
