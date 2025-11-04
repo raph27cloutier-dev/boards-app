@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { render } from '../../test/test-utils';
 import { EventDetail } from '../EventDetail';
 import { eventsAPI } from '../../lib/api';
@@ -37,6 +36,10 @@ const mockEvent = {
   vibe: ['Chill', 'Social'],
   hostId: 'host-123',
   imageUrl: 'https://example.com/image.jpg',
+  popularityScore: 0,
+  trustScore: 0,
+  createdAt: '2025-11-04T00:00:00Z',
+  updatedAt: '2025-11-04T00:00:00Z',
 };
 
 const mockUser = {
@@ -83,22 +86,34 @@ describe('RSVP Functionality', () => {
         id: 'rsvp-1',
         userId: 'user-1',
         eventId: '1',
-        status: 'going',
+        status: 'going' as const,
+        createdAt: '2025-11-04T00:00:00Z',
         user: {
           id: 'user-1',
+          email: 'john@example.com',
           username: 'john',
-          avatarUrl: null,
+          avatarUrl: undefined,
+          vibePrefs: ['Chill'],
+          trustScore: 0,
+          createdAt: '2025-11-04T00:00:00Z',
+          updatedAt: '2025-11-04T00:00:00Z',
         },
       },
       {
         id: 'rsvp-2',
         userId: 'user-2',
         eventId: '1',
-        status: 'going',
+        status: 'going' as const,
+        createdAt: '2025-11-04T00:00:00Z',
         user: {
           id: 'user-2',
+          email: 'jane@example.com',
           username: 'jane',
-          avatarUrl: null,
+          avatarUrl: undefined,
+          vibePrefs: ['Social'],
+          trustScore: 0,
+          createdAt: '2025-11-04T00:00:00Z',
+          updatedAt: '2025-11-04T00:00:00Z',
         },
       },
     ];

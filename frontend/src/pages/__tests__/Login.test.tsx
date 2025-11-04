@@ -63,6 +63,10 @@ describe('Login Component', () => {
       email: 'test@example.com',
       username: 'testuser',
       displayName: 'Test User',
+      vibePrefs: ['Chill', 'Social'],
+      trustScore: 0,
+      createdAt: '2025-11-04T00:00:00Z',
+      updatedAt: '2025-11-04T00:00:00Z',
     };
     const mockToken = 'mock-jwt-token';
 
@@ -132,8 +136,7 @@ describe('Login Component', () => {
     expect(signupLink).toHaveAttribute('href', '/signup');
   });
 
-  it('requires email and password fields', async () => {
-    const user = userEvent.setup();
+  it('requires email and password fields', () => {
     render(<Login />);
 
     const emailInput = screen.getByLabelText(/email/i);

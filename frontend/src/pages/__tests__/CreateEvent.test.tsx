@@ -85,6 +85,14 @@ describe('CreateEvent Component', () => {
       id: '1',
       title: 'Test Event',
       description: 'A great test event',
+      startTime: '2025-12-01T19:00:00Z',
+      endTime: '2025-12-01T23:00:00Z',
+      vibe: ['Chill'],
+      popularityScore: 0,
+      trustScore: 0,
+      hostId: '1',
+      createdAt: '2025-11-04T00:00:00Z',
+      updatedAt: '2025-11-04T00:00:00Z',
     };
 
     vi.mocked(eventsAPI.create).mockResolvedValue(mockEvent);
