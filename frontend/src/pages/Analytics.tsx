@@ -26,7 +26,7 @@ interface HostDashboardData {
 }
 
 export const Analytics: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const { data: analytics, isLoading, error } = useQuery<HostDashboardData>({
     queryKey: ['host-analytics'],
